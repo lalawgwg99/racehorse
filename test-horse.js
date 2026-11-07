@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -440,6 +440,50 @@ dam27.sex = '母'; dam27.age = 3; T.state.horses.push(dam27);
 const nBefore = T.state.horses.length;
 T.breed(sire27.id, dam27.id);
 t('T27 引退公馬能配種', T.state.horses.length === nBefore + 1, T.state.horses.length);
+
+// --- T28 兌換碼 ---
+T.state = T.createDefaultState();
+T.state.money = 100000;
+t('T28 vip9988領999998', T.redeemCode('vip9988') === 'ok' && T.state.money === 100000 + 999998, T.state.money);
+t('T28 重複領不到', T.redeemCode('vip9988') === 'used' && T.state.money === 100000 + 999998, T.state.money);
+t('T28 錯碼不給', T.redeemCode('nope123') === 'invalid' && T.state.money === 100000 + 999998);
+T.state = T.createDefaultState();
+T.state.money = 100000;
+t('T28 大寫也認', T.redeemCode('VIP9988') === 'ok' && T.state.money === 100000 + 999998, T.state.money);
+
+// --- T29 抽卡單抽 ---
+T.state = T.createDefaultState();
+T.state.money = 100000;
+mockRandom(0.5);
+const r1 = T.drawGacha(1);
+t('T29 首次單抽免費', T.state.money === 100000, T.state.money);
+t('T29 單抽出1個', r1 && r1.length === 1, r1 && r1.length);
+t('T29 首次免費已用', T.state.gachaFreeUsed === true);
+const r2 = T.drawGacha(1);
+t('T29 第二次扣10000', T.state.money === 90000, T.state.money);
+unmock();
+
+// --- T30 十連抽保底 ---
+T.state = T.createDefaultState();
+T.state.money = 1000000;
+mockRandom(0.1);
+const r10 = T.drawGacha(10);
+t('T30 十連出10個', r10 && r10.length === 10, r10 && r10.length);
+t('T30 十連必有高稀有', r10.some(r => r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend')));
+t('T30 十連扣錢後有找', T.state.money > 910000, T.state.money);
+t('T30 馬房不超過6匹', T.state.horses.length === 6, T.state.horses.length);
+unmock();
+
+// --- T31 馬房滿了自動出售 ---
+T.state = T.createDefaultState();
+T.state.money = 1000000;
+while (T.state.horses.length < 6) T.state.horses.push(T.newHorse({ rarity: 'common' }));
+mockRandom(0.1);
+const mBefore = T.state.money;
+const rF = T.drawGacha(10);
+t('T31 滿房馬不增加', T.state.horses.length === 6, T.state.horses.length);
+t('T31 滿房抽到的馬全賣掉換金', rF.every(r => r.kind !== 'horse' || r.kept === false) && T.state.money > mBefore - 90000, T.state.money);
+unmock();
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

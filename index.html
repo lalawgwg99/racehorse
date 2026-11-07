@@ -107,6 +107,8 @@
 
     <!-- 商店 -->
     <section id="view-shop" class="space-y-3 hidden">
+      <div id="gacha-panel" class="card p-4"></div>
+      <div id="redeem-panel" class="card p-4"></div>
       <div class="card p-4">
         <div class="flex items-center justify-between">
           <h2 class="font-black text-base">🛒 馬匹市場</h2>
@@ -407,6 +409,9 @@ function migrateState() {
   if (!state.shopJockeys) state.shopJockeys = [genJockey(), genJockey()];
   if (state.pendingBet === undefined) state.pendingBet = null;
   if (state.legacyPoints === undefined) state.legacyPoints = 0;
+  if (state.gachaPity === undefined) state.gachaPity = 0;
+  if (state.gachaFreeUsed === undefined) state.gachaFreeUsed = false;
+  if (!state.redeemedCodes) state.redeemedCodes = [];
   (state.jockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   (state.shopJockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); });
@@ -432,6 +437,9 @@ function createDefaultState() {
     logs: [{ week: '第1年・第1週', text: '歡迎來到天駒養成錄！「追風小子」已經在馬房等你，先去育成練一週，再報名新馬戰吧。' }],
     hall: [],
     legacyPoints: 0,
+    gachaPity: 0,
+    gachaFreeUsed: false,
+    redeemedCodes: [],
     jockeys: [rookie],
     activeJockeyId: rookie.id,
     totalRaces: 0,
@@ -1288,7 +1296,135 @@ function renderRace() {
     .map(l => '<div><span class="text-[#9a8f7a]">' + esc(l.week) + '</span>　' + esc(l.text) + '</div>').join('')
     || '<div>還沒有出賽紀錄，先去育成練一週再來報名新馬戰。</div>';
 }
+/* ================= 兌換碼 ================= */
+const REDEEM_CODES = {
+  vip9988: { gold: 999998, label: 'VIP 禮包' },
+};
+function redeemCode(raw) {
+  const code = String(raw || '').trim().toLowerCase();
+  const reward = REDEEM_CODES[code];
+  if (!reward) { showToast('兌換碼不正確'); return 'invalid'; }
+  if (!state.redeemedCodes) state.redeemedCodes = [];
+  if (state.redeemedCodes.includes(code)) { showToast('這個兌換碼已經領過了'); return 'used'; }
+  state.redeemedCodes.push(code);
+  state.money += reward.gold;
+  addLog('🎟️ 兌換「' + code + '」領到 ' + fmt(reward.gold) + ' 金！');
+  showToast('領到 ' + fmt(reward.gold) + ' 金！');
+  sfx('win');
+  sfx('coin');
+  saveState();
+  renderAll();
+  return 'ok';
+}
+function renderRedeemPanel() {
+  const panel = $('redeem-panel');
+  panel.innerHTML = '<h2 class="font-black text-base">🎟️ 兌換碼</h2>'
+    + '<p class="text-xs text-[#5c5346] mt-1">輸入兌換碼領獎勵，每組碼只能領一次。</p>'
+    + '<div class="flex gap-2 mt-2"><input id="redeem-input" type="text" placeholder="輸入兌換碼" class="card p-2 text-sm font-bold flex-1 min-w-0"><button type="button" id="btn-redeem" class="gold-btn text-sm px-4 py-2">兌換</button></div>'
+    + ((state.redeemedCodes && state.redeemedCodes.length) ? '<p class="text-[11px] text-[#9a8f7a] mt-2">已領過：' + state.redeemedCodes.map(esc).join('、') + '</p>' : '');
+  $('btn-redeem').addEventListener('click', () => redeemCode($('redeem-input').value));
+}
+
+/* ================= 抽卡 ================= */
+const GACHA_SINGLE = 10000, GACHA_TEN = 90000;
+let lastGachaResults = null;
+function gachaHigh(item) {
+  if (item.kind === 'horse') return item.horse.rarity === 'noble' || item.horse.rarity === 'legend';
+  if (item.kind === 'equip') return item.equip.tier === 'master' || item.equip.tier === 'legend';
+  return item.jockey.grade === 'elite' || item.jockey.grade === 'ace';
+}
+function genGachaItem(forceHigh) {
+  const r = Math.random();
+  const kind = r < 0.5 ? 'horse' : (r < 0.8 ? 'equip' : 'jockey');
+  if (kind === 'horse') {
+    let h = genShopHorse();
+    if (forceHigh && h.rarity !== 'noble' && h.rarity !== 'legend') {
+      h = newHorse({ rarity: Math.random() < 0.3 ? 'legend' : 'noble' });
+      h.price = horsePrice(h);
+    }
+    return { kind: 'horse', horse: h };
+  }
+  if (kind === 'equip') {
+    if (forceHigh) return { kind: 'equip', equip: genEquipment(undefined, Math.random() < 0.3 ? 'legend' : 'master') };
+    return { kind: 'equip', equip: genEquipment() };
+  }
+  if (forceHigh) return { kind: 'jockey', jockey: genJockey(Math.random() < 0.3 ? 'ace' : 'elite') };
+  return { kind: 'jockey', jockey: genJockey() };
+}
+function drawGacha(count) {
+  const isTen = count === 10;
+  let cost = isTen ? GACHA_TEN : GACHA_SINGLE;
+  if (!isTen && !state.gachaFreeUsed) cost = 0;
+  if (state.money < cost) { showToast('金不夠，' + (isTen ? '十連抽' : '單抽') + '要 ' + fmt(cost) + ' 金'); return null; }
+  state.money -= cost;
+  if (!isTen && cost === 0) state.gachaFreeUsed = true;
+  const items = [];
+  for (let i = 0; i < count; i++) {
+    items.push(genGachaItem((state.gachaPity || 0) + i >= 9));
+  }
+  const horseRank = { common: 0, good: 1, noble: 2, legend: 3 };
+  const statSum = h => STAT_KEYS.reduce((a, k) => a + h.stats[k], 0);
+  const drawnHorses = items.filter(it => it.kind === 'horse');
+  drawnHorses.sort((a, b) => (horseRank[b.horse.rarity] - horseRank[a.horse.rarity]) || (statSum(b.horse) - statSum(a.horse)));
+  const freeSlots = Math.max(0, MAX_STABLE - state.horses.length);
+  const keepSet = new Set(drawnHorses.slice(0, freeSlots));
+  const results = [];
+  let pity = state.gachaPity || 0;
+  items.forEach(it => {
+    if (gachaHigh(it)) pity = 0; else pity += 1;
+    if (it.kind === 'horse') {
+      if (keepSet.has(it)) {
+        const kept = Object.assign({}, it.horse);
+        delete kept.price;
+        state.horses.push(kept);
+        results.push({ kind: 'horse', name: kept.name, rarity: kept.rarity, kept: true });
+      } else {
+        const val = Math.round(horsePrice(it.horse) * 0.5);
+        state.money += val;
+        results.push({ kind: 'horse', name: it.horse.name, rarity: it.horse.rarity, kept: false, soldFor: val });
+      }
+    } else if (it.kind === 'equip') {
+      state.equipment.push(it.equip);
+      results.push({ kind: 'equip', name: it.equip.name, tier: it.equip.tier, kept: true });
+    } else {
+      state.jockeys.push(it.jockey);
+      results.push({ kind: 'jockey', name: it.jockey.name, grade: it.jockey.grade, kept: true });
+    }
+  });
+  state.gachaPity = pity;
+  lastGachaResults = results;
+  const isHighRes = r => (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
+  const highs = results.filter(isHighRes);
+  addLog('🎰 抽卡' + (isTen ? '十連' : '單抽') + '：' + (highs.length ? '中了 ' + highs.map(x => x.name).join('、') + '！' : '沒有高稀有，下次保底見。'));
+  showToast(highs.length ? '中了 ' + highs[0].name + '！' : (isTen ? '十連抽完成' : '單抽完成'));
+  sfx(highs.length ? 'win' : 'coin');
+  saveState();
+  renderAll();
+  return results;
+}
+function renderGachaPanel() {
+  const panel = $('gacha-panel');
+  const pityLeft = 10 - (state.gachaPity || 0);
+  let html = '<h2 class="font-black text-base">🎰 抽卡 <span class="text-xs font-bold text-[#5c5346]">馬 50%・裝備 30%・騎師 20%</span></h2>'
+    + '<p class="text-xs text-[#5c5346] mt-1">馬：普通 45%／良血 30%／名門 18%／傳奇 7%；裝備：粗製 55%／精良 25%／名匠 15%／傳奇 5%；騎師：見習 50%／普通 30%／精英 15%／王牌 5%。高稀有（名門馬／名匠裝備／精英騎師以上）每 10 抽必出 1 個，現在保底還差 <b>' + pityLeft + '</b> 抽。馬房滿了時多抽到的馬會自動出售換金（市價五成）。</p>'
+    + '<div class="grid grid-cols-2 gap-2 mt-2">'
+    + '<button type="button" id="btn-gacha-1" class="gold-btn text-sm px-4 py-2.5">單抽' + (state.gachaFreeUsed ? '・10,000 金' : '・首次免費') + '</button>'
+    + '<button type="button" id="btn-gacha-10" class="gold-btn text-sm px-4 py-2.5">十連抽・90,000 金</button>'
+    + '</div>';
+  if (lastGachaResults) {
+    html += '<div class="mt-3 space-y-1.5">' + lastGachaResults.map(r => {
+      const high = (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
+      const label = r.kind === 'horse' ? '🐴 ' + esc(r.name) + '（' + RARITY[r.rarity].label + '馬）' : (r.kind === 'equip' ? '🎒 ' + esc(r.name) : '🧢 ' + esc(r.name));
+      return '<div class="flex items-center justify-between text-xs p-2 rounded-lg ' + (high ? 'bg-[#fff8e6] border border-[#d9941a] font-black' : 'bg-white border border-[#e6dcc5]') + '"><span>' + label + '</span><span>' + (r.kept ? '✅ 已保留' : '💰 已售 +' + fmt(r.soldFor) + ' 金') + '</span></div>';
+    }).join('') + '</div>';
+  }
+  panel.innerHTML = html;
+  $('btn-gacha-1').addEventListener('click', () => drawGacha(1));
+  $('btn-gacha-10').addEventListener('click', () => drawGacha(10));
+}
 function renderShop() {
+  renderGachaPanel();
+  renderRedeemPanel();
   $('btn-refresh-shop').textContent = state.shopFreeRefresh ? '換一批（本週免費）' : '換一批（2,000 金）';
   $('shop-list').innerHTML = state.shop.map((h, i) => {
     return '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white">'
