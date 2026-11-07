@@ -7,4 +7,4 @@
 - 馬房最多 6 匹，市場每週換 3 匹；2 歲出道、5 歲後衰退、6 歲引退；G1 冠軍進名人堂
 - 單檔 `index.html`，手機直式，存檔在本機瀏覽器
 
-線上玩：https://racehorse.pages.dev（Cloudflare Pages）
+線上玩：https://racehorse-8bu.pages.dev（Cloudflare Pages）
