@@ -132,13 +132,13 @@ const STAT_KEYS = ['spd', 'sta', 'pow', 'gut', 'wis'];
 const STAT_LABEL = { spd: '速度', sta: '耐力', pow: '力量', gut: '根性', wis: '智慧' };
 const MOOD_LABEL = ['極差', '不調', '普通', '好調', '絕好調'];
 const RARITY = {
-  common: { label: '普通', cap: 70, color: '#5c5346', priceBase: 20000 },
-  good:   { label: '良血', cap: 80, color: '#1d6b41', priceBase: 50000 },
-  noble:  { label: '名門', cap: 90, color: '#1d4ed8', priceBase: 120000 },
-  legend: { label: '傳奇', cap: 99, color: '#d9941a', priceBase: 300000 },
+  common: { label: '普通', cap: 70, color: '#5c5346', priceBase: 15000 },
+  good:   { label: '良血', cap: 80, color: '#1d6b41', priceBase: 40000 },
+  noble:  { label: '名門', cap: 90, color: '#1d4ed8', priceBase: 100000 },
+  legend: { label: '傳奇', cap: 99, color: '#d9941a', priceBase: 250000 },
 };
 const RACES = [
-  { id: 'maiden', name: '新馬戰', tier: '新馬', minWins: 0, minAge: 2, prize: 30000, dist: 1200, distType: '短', turf: '草', oppBase: 45 },
+  { id: 'maiden', name: '新馬戰', tier: '新馬', minWins: 0, minAge: 2, prize: 30000, dist: 1200, distType: '短', turf: '草', oppBase: 42 },
   { id: 'cond',   name: '條件戰', tier: '條件', minWins: 1, minAge: 2, prize: 50000, dist: 1600, distType: '中', turf: '草', oppBase: 60 },
   { id: 'open',   name: '公開賽', tier: '公開', minWins: 2, minAge: 2, prize: 100000, dist: 1800, distType: '中', turf: '草', oppBase: 72 },
   { id: 'g3',     name: 'G3・青葉賞', tier: 'G3', minWins: 3, minAge: 3, prize: 300000, dist: 2000, distType: '中', turf: '草', oppBase: 82 },
@@ -216,7 +216,7 @@ function newHorse(opts) {
 function horsePrice(h) {
   const base = RARITY[h.rarity].priceBase;
   const sum = STAT_KEYS.reduce((s, k) => s + h.stats[k], 0);
-  return base + sum * 500;
+  return base + sum * 300;
 }
 function genShopHorse() {
   const h = newHorse();
@@ -226,6 +226,8 @@ function genShopHorse() {
 function createDefaultState() {
   const starter = newHorse({ rarity: 'good' });
   starter.name = '追風小子';
+  starter.turf = '草';
+  starter.dist = '短';
   return {
     money: 100000,
     year: 1,
@@ -394,13 +396,15 @@ function calcPower(h, race) {
   const moodMult = [0.90, 0.95, 1.0, 1.05, 1.10][h.mood];
   return base * fit * moodMult;
 }
-function genOpponent(race) {
+function genOpponent(race, name) {
   const p = race.oppBase + randInt(-8, 8);
-  return { name: randPick(OPP_NAMES), power: p, isPlayer: false };
+  return { name: name, power: p, isPlayer: false };
 }
 function calcRaceOutcome(h, race) {
   const runners = [{ name: h.name, power: calcPower(h, race), isPlayer: true }];
-  for (let i = 0; i < 7; i++) runners.push(genOpponent(race));
+  const pool = OPP_NAMES.slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+  for (let i = 0; i < 7; i++) runners.push(genOpponent(race, pool[i]));
   runners.forEach(r => { r.eff = r.power * (0.92 + Math.random() * 0.16); });
   runners.sort((a, b) => b.eff - a.eff);
   runners.forEach((r, i) => { r.rank = i + 1; });
@@ -433,7 +437,7 @@ function runRace(raceId) {
     + '<p class="text-xs text-[#5c5346] mt-2">正在衝刺…結果由實力、適性、心情與臨場發揮決定</p>';
   live.scrollIntoView({ behavior: 'smooth', block: 'center' });
   const maxEff = Math.max.apply(null, outcome.runners.map(r => r.eff));
-  const durs = outcome.runners.map(r => 5200 * (maxEff / r.eff));
+  const durs = outcome.runners.map(r => Math.min(7000, 5200 * (maxEff / r.eff)));
   const startAt = Date.now();
   outcome.runners.forEach((r, i) => {
     const bar = $('lane-' + i);
@@ -582,7 +586,7 @@ function renderStable() {
   if (!h) { detail.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的，去商店買一匹馬吧。</p>'; return; }
   const cap = statCap(h);
   detail.innerHTML = '<div class="flex items-start gap-3">'
-    + '<img src="assets/horse-bay.webp" alt="賽馬" class="w-24 h-24 object-cover rounded-xl border border-[#d8cbb3]" onerror="this.style.display=\'none\'">'
+    + '<img src="assets/horse-bay.webp" alt="賽馬" class="w-24 h-24 object-cover rounded-xl border border-[#d8cbb3] bg-[#f4ede0]" onerror="this.style.display=\'none\'">'
     + '<div class="flex-1"><div class="flex items-center gap-2 flex-wrap"><span class="font-black text-base">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
     + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離</div>'
     + '<div class="text-xs mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b></div>'
@@ -608,7 +612,7 @@ function renderTrain() {
     { label: '力量訓練', sub: '體力 -18', fn: () => doTrain('pow'), cls: 'gold-btn' },
     { label: '根性訓練', sub: '體力 -18', fn: () => doTrain('gut'), cls: 'gold-btn' },
     { label: '智慧訓練', sub: '體力 -18', fn: () => doTrain('wis'), cls: 'gold-btn' },
-    { label: '休息', sub: '體力 +35', fn: doRest, cls: 'green-btn' },
+    { label: '休息', sub: '體力 +35（上限 100）', fn: doRest, cls: 'green-btn' },
     { label: '散步', sub: '心情 +1・體力 +12', fn: doWalk, cls: 'green-btn' },
     { label: '特級飼料', sub: '800 金・體力 +25', fn: doFeed, cls: 'ink-btn' },
   ];
