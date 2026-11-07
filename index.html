@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>天駒養成錄｜馬王之路</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  body { background: #0e2a1a; font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; }
+  .turf-bg { background: linear-gradient(180deg, #14532d 0%, #0e2a1a 100%); }
+  .card { background: #fdfbf3; border: 1px solid #d8cbb3; border-radius: 1rem; }
+  .gold-btn { background: linear-gradient(180deg, #f6c453, #d9941a); color: #3a2503; font-weight: 800; border-radius: .75rem; box-shadow: 0 2px 0 #9c6b21; }
+  .gold-btn:active { transform: translateY(1px); box-shadow: none; }
+  .green-btn { background: linear-gradient(180deg, #2f9e63, #1d6b41); color: #fff; font-weight: 800; border-radius: .75rem; box-shadow: 0 2px 0 #14532d; }
+  .green-btn:active { transform: translateY(1px); box-shadow: none; }
+  .ink-btn { background: #1e1a16; color: #fdfbf3; font-weight: 800; border-radius: .75rem; }
+  .paper-btn { background: #f4ede0; color: #5c5346; font-weight: 700; border: 1px solid #d8cbb3; border-radius: .75rem; }
+  .nav-btn { flex: 1; padding: .6rem 0 .7rem; font-size: 13px; font-weight: 800; color: #b8a686; text-align: center; }
+  .nav-btn.active { color: #f6c453; }
+  .stat-bar { height: .5rem; background: #e6dcc5; border-radius: 999px; overflow: hidden; }
+  .stat-fill { height: 100%; border-radius: 999px; transition: width .3s; }
+  .mood-4 { color: #d9941a; } .mood-3 { color: #1d6b41; } .mood-2 { color: #5c5346; } .mood-1 { color: #9e2a22; } .mood-0 { color: #9e2a22; }
+  .race-lane { display: flex; align-items: center; gap: .4rem; margin-bottom: .45rem; }
+  .race-track { flex: 1; height: 1.4rem; background: #e6dcc5; border-radius: 999px; position: relative; overflow: hidden; }
+  .race-runner { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; transition: width .2s linear; display: flex; align-items: center; padding-left: .4rem; font-size: 11px; font-weight: 800; color: #fff; white-space: nowrap; }
+  .fade-in { animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .float-text { animation: floatUp 1.2s ease forwards; }
+  @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-24px); } }
+</style>
+</head>
+<body class="turf-bg min-h-screen text-[#1e1a16]">
+<div class="max-w-md mx-auto min-h-screen flex flex-col pb-20">
+
+  <!-- 頂部資源列 -->
+  <header class="sticky top-0 z-20 px-3 pt-3 pb-2" style="background:rgba(14,42,26,.95)">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-[#f6c453] font-black text-lg leading-none">🐎 天駒養成錄</div>
+        <div id="header-season" class="text-[#b8d8a8] text-xs mt-1">第 1 年・第 1 週</div>
+      </div>
+      <div class="text-right">
+        <div id="header-money" class="text-[#f6c453] font-black text-lg leading-none">💰 100,000</div>
+        <div id="header-horses" class="text-[#b8d8a8] text-xs mt-1">馬房 1/6</div>
+      </div>
+    </div>
+    <div id="toast-banner" class="hidden mt-2 text-center text-xs font-bold text-[#3a2503] bg-[#f6c453] rounded-lg px-3 py-2"></div>
+  </header>
+
+  <main class="flex-1 px-3 space-y-3">
+    <!-- 馬房 -->
+    <section id="view-stable" class="space-y-3">
+      <div class="card p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-black text-base">🏇 馬房</h2>
+          <span id="stable-count" class="text-xs font-bold text-[#5c5346]"></span>
+        </div>
+        <div id="stable-list" class="space-y-2 mt-2"></div>
+      </div>
+      <div id="horse-detail" class="card p-4"></div>
+    </section>
+
+    <!-- 育成 -->
+    <section id="view-train" class="space-y-3 hidden">
+      <div class="card p-4">
+        <h2 class="font-black text-base">🌱 育成 <span class="text-xs font-bold text-[#5c5346]">每週選一項行動</span></h2>
+        <div id="train-horse-summary" class="mt-2"></div>
+        <div id="train-actions" class="grid grid-cols-2 gap-2 mt-3"></div>
+      </div>
+      <div class="card p-4">
+        <h2 class="font-black text-base">📋 育成紀錄</h2>
+        <div id="train-log" class="text-xs text-[#5c5346] space-y-1 mt-2"></div>
+      </div>
+    </section>
+
+    <!-- 比賽 -->
+    <section id="view-race" class="space-y-3 hidden">
+      <div class="card p-4">
+        <h2 class="font-black text-base">🏆 比賽 <span class="text-xs font-bold text-[#5c5346]">報名佔用當週行動</span></h2>
+        <div id="race-list" class="space-y-2 mt-2"></div>
+      </div>
+      <div id="race-live" class="card p-4 hidden"></div>
+      <div class="card p-4">
+        <h2 class="font-black text-base">🎖️ 戰績</h2>
+        <div id="race-records" class="text-xs text-[#5c5346] space-y-1 mt-2"></div>
+      </div>
+    </section>
+
+    <!-- 商店 -->
+    <section id="view-shop" class="space-y-3 hidden">
+      <div class="card p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-black text-base">🛒 馬匹市場</h2>
+          <button id="btn-refresh-shop" type="button" class="paper-btn text-xs px-3 py-1.5">換一批（本週免費）</button>
+        </div>
+        <p class="text-xs text-[#5c5346] mt-1">每週刷新三匹。稀有度影響成長上限與價格。</p>
+        <div id="shop-list" class="space-y-2 mt-2"></div>
+      </div>
+    </section>
+
+    <!-- 名人堂 -->
+    <section id="view-hall" class="space-y-3 hidden">
+      <div class="card p-4">
+        <h2 class="font-black text-base">👑 名人堂</h2>
+        <div id="hall-list" class="space-y-2 mt-2"></div>
+      </div>
+      <div class="card p-4">
+        <h2 class="font-black text-base">📊 牧場紀錄</h2>
+        <div id="farm-stats" class="text-xs text-[#5c5346] space-y-1 mt-2"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 底部導覽 -->
+  <nav class="fixed bottom-0 left-0 right-0 z-20" style="background:#0a1f13">
+    <div class="max-w-md mx-auto flex">
+      <button type="button" class="nav-btn active" data-view="stable">🏇 馬房</button>
+      <button type="button" class="nav-btn" data-view="train">🌱 育成</button>
+      <button type="button" class="nav-btn" data-view="race">🏆 比賽</button>
+      <button type="button" class="nav-btn" data-view="shop">🛒 商店</button>
+      <button type="button" class="nav-btn" data-view="hall">👑 名人堂</button>
+    </div>
+  </nav>
+</div>
+
+<script>
+'use strict';
+/* ================= 資料 ================= */
+const STORAGE_KEY = 'tianju_save_v1';
+const MAX_STABLE = 6;
+const STAT_KEYS = ['spd', 'sta', 'pow', 'gut', 'wis'];
+const STAT_LABEL = { spd: '速度', sta: '耐力', pow: '力量', gut: '根性', wis: '智慧' };
+const MOOD_LABEL = ['極差', '不調', '普通', '好調', '絕好調'];
+const RARITY = {
+  common: { label: '普通', cap: 70, color: '#5c5346', priceBase: 20000 },
+  good:   { label: '良血', cap: 80, color: '#1d6b41', priceBase: 50000 },
+  noble:  { label: '名門', cap: 90, color: '#1d4ed8', priceBase: 120000 },
+  legend: { label: '傳奇', cap: 99, color: '#d9941a', priceBase: 300000 },
+};
+const RACES = [
+  { id: 'maiden', name: '新馬戰', tier: '新馬', minWins: 0, minAge: 2, prize: 30000, dist: 1200, distType: '短', turf: '草', oppBase: 45 },
+  { id: 'cond',   name: '條件戰', tier: '條件', minWins: 1, minAge: 2, prize: 50000, dist: 1600, distType: '中', turf: '草', oppBase: 60 },
+  { id: 'open',   name: '公開賽', tier: '公開', minWins: 2, minAge: 2, prize: 100000, dist: 1800, distType: '中', turf: '草', oppBase: 72 },
+  { id: 'g3',     name: 'G3・青葉賞', tier: 'G3', minWins: 3, minAge: 3, prize: 300000, dist: 2000, distType: '中', turf: '草', oppBase: 82 },
+  { id: 'g2',     name: 'G2・天駒盃', tier: 'G2', minWins: 4, minAge: 3, prize: 600000, dist: 2200, distType: '長', turf: '草', oppBase: 90 },
+  { id: 'g1',     name: 'G1・天駒大賞', tier: 'G1', minWins: 5, minAge: 3, prize: 1200000, dist: 2400, distType: '長', turf: '草', oppBase: 98 },
+];
+const NAME_A = ['烈風', '追風', '雷霆', '疾風', '星月', '雪影', '烈焰', '龍騰', '虎嘯', '金駒', '銀蹄', '赤兔', '玄風', '青雲', '白駒', '紫電', '金光', '飛燕', '破曉', '晨光', '夜鷹', '海浪', '山嵐', '火鳳', '冰霜', '狂風', '閃電', '流星', '彩虹', '黑豹'];
+const NAME_B = ['號', '之星', '王者', '傳奇', '疾風', '飛馳', '旋風', '雄心', '戰士', '小子', '公主', '王子'];
+const OPP_NAMES = ['疾風迅雷', '草原之風', '鐵蹄無敵', '月光寶駒', '烈焰戰馬', '銀河快駒', '王者之風', '黑旋風', '白龍馬', '赤兔二世', '雷霆萬鈞', '追月流星', '金甲神駒', '風馳電掣'];
+
+/* ================= 工具 ================= */
+function $(id) { return document.getElementById(id); }
+function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function randPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function uid() { return 'h' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+/* ================= 狀態 ================= */
+let state = null;
+let currentView = 'stable';
+let racing = false;
+
+function genHorseName(existing) {
+  for (let i = 0; i < 50; i++) {
+    const n = randPick(NAME_A) + randPick(NAME_B);
+    if (!existing.includes(n)) return n;
+  }
+  return randPick(NAME_A) + '號' + randInt(2, 99);
+}
+function rollRarity() {
+  const r = Math.random();
+  if (r < 0.45) return 'common';
+  if (r < 0.75) return 'good';
+  if (r < 0.93) return 'noble';
+  return 'legend';
+}
+function rarityStatRange(rarity) {
+  if (rarity === 'common') return [25, 45];
+  if (rarity === 'good') return [35, 55];
+  if (rarity === 'noble') return [45, 65];
+  return [55, 75];
+}
+function newHorse(opts) {
+  opts = opts || {};
+  const rarity = opts.rarity || rollRarity();
+  const range = rarityStatRange(rarity);
+  const stats = {};
+  STAT_KEYS.forEach(k => { stats[k] = randInt(range[0], range[1]); });
+  const r = Math.random();
+  const turf = r < 0.60 ? '草' : (r < 0.85 ? '泥' : '兩用');
+  const d = Math.random();
+  const dist = d < 0.30 ? '短' : (d < 0.75 ? '中' : '長');
+  return {
+    id: opts.id || uid(),
+    name: opts.name || genHorseName((state ? state.horses : []).map(h => h.name)),
+    age: opts.age || 2,
+    sex: Math.random() < 0.5 ? '公' : '母',
+    rarity: rarity,
+    stats: stats,
+    energy: 100,
+    mood: 2,
+    turf: turf,
+    dist: dist,
+    wins: 0,
+    races: 0,
+    earnings: 0,
+    g1wins: 0,
+    g2wins: 0,
+    g3wins: 0,
+    retired: false,
+  };
+}
+function horsePrice(h) {
+  const base = RARITY[h.rarity].priceBase;
+  const sum = STAT_KEYS.reduce((s, k) => s + h.stats[k], 0);
+  return base + sum * 500;
+}
+function genShopHorse() {
+  const h = newHorse();
+  h.price = horsePrice(h);
+  return h;
+}
+function createDefaultState() {
+  const starter = newHorse({ rarity: 'good' });
+  starter.name = '追風小子';
+  return {
+    money: 100000,
+    year: 1,
+    week: 1,
+    horses: [starter],
+    activeHorseId: starter.id,
+    shop: [genShopHorse(), genShopHorse(), genShopHorse()],
+    shopFreeRefresh: true,
+    logs: [{ week: '第1年・第1週', text: '歡迎來到天駒養成錄！「追風小子」已經在馬房等你，先去育成練一週，再報名新馬戰吧。' }],
+    hall: [],
+    totalRaces: 0,
+    totalWins: 0,
+    totalEarnings: 0,
+    saveVersion: 1,
+  };
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* 容量滿了就跳過 */ }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.horses) || !parsed.horses.length) return null;
+    return parsed;
+  } catch (e) { return null; }
+}
+function activeHorse() {
+  return state.horses.find(h => h.id === state.activeHorseId) || state.horses.find(h => !h.retired) || state.horses[0] || null;
+}
+function addLog(text) {
+  state.logs.unshift({ week: '第' + state.year + '年・第' + state.week + '週', text: text });
+  if (state.logs.length > 30) state.logs.length = 30;
+}
+let toastTimer = null;
+function showToast(text) {
+  const el = $('toast-banner');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2800);
+}
+
+/* ================= 育成 ================= */
+function statCap(h) { return RARITY[h.rarity].cap; }
+function doTrain(statKey) {
+  const h = activeHorse();
+  if (!h || h.retired) { showToast('請先在馬房選一匹現役馬'); return; }
+  if (h.energy < 18) { showToast('體力不足，先休息或餵食'); return; }
+  h.energy = clamp(h.energy - 18, 0, 100);
+  if (Math.random() < 0.08) {
+    h.energy = clamp(h.energy - 10, 0, 100);
+    h.mood = clamp(h.mood - 1, 0, 4);
+    addLog(h.name + '訓練失敗，狀態有點低落…（體力 -10）');
+    showToast('訓練失敗！' + h.name + '有點低落');
+  } else {
+    let gain = randInt(2, 4) + (h.mood >= 3 ? 1 : 0);
+    const cap = statCap(h);
+    const before = h.stats[statKey];
+    h.stats[statKey] = clamp(h.stats[statKey] + gain, 10, cap);
+    const real = h.stats[statKey] - before;
+    addLog(h.name + STAT_LABEL[statKey] + '訓練：' + before + ' → ' + h.stats[statKey] + (real < gain ? '（已達' + RARITY[h.rarity].label + '上限 ' + cap + '）' : '') + '，體力 -18');
+    showToast(STAT_LABEL[statKey] + ' +' + real + '！');
+  }
+  afterAction();
+}
+function doRest() {
+  const h = activeHorse();
+  if (!h || h.retired) { showToast('請先在馬房選一匹現役馬'); return; }
+  const before = h.energy;
+  h.energy = clamp(h.energy + 35, 0, 100);
+  addLog(h.name + '好好休息了一週，體力 ' + before + ' → ' + h.energy);
+  showToast('體力 +' + (h.energy - before));
+  afterAction();
+}
+function doWalk() {
+  const h = activeHorse();
+  if (!h || h.retired) { showToast('請先在馬房選一匹現役馬'); return; }
+  const beforeMood = h.mood;
+  h.mood = clamp(h.mood + 1, 0, 4);
+  h.energy = clamp(h.energy + 12, 0, 100);
+  addLog(h.name + '去草地散步，心情 ' + MOOD_LABEL[beforeMood] + ' → ' + MOOD_LABEL[h.mood] + '，體力 +12');
+  showToast('心情變成「' + MOOD_LABEL[h.mood] + '」');
+  afterAction();
+}
+function doFeed() {
+  const h = activeHorse();
+  if (!h || h.retired) { showToast('請先在馬房選一匹現役馬'); return; }
+  if (state.money < 800) { showToast('金不夠，特級飼料要 800 金'); return; }
+  state.money -= 800;
+  h.energy = clamp(h.energy + 25, 0, 100);
+  const key = randPick(STAT_KEYS);
+  const before = h.stats[key];
+  h.stats[key] = clamp(h.stats[key] + 1, 10, statCap(h));
+  addLog(h.name + '吃了特級飼料（-800 金），體力 +25，' + STAT_LABEL[key] + ' ' + before + ' → ' + h.stats[key]);
+  showToast('體力 +25，' + STAT_LABEL[key] + ' +1');
+  afterAction();
+}
+
+/* ================= 週次推進 ================= */
+function weeklyEvent(h) {
+  if (Math.random() > 0.12 || !h) return;
+  const roll = Math.random();
+  if (roll < 0.3) {
+    state.money += 5000;
+    addLog('🎉 贊助商來訪！' + h.name + '登上地方報，贊助金 +5,000');
+    showToast('贊助金 +5,000！');
+  } else if (roll < 0.55) {
+    h.mood = 4;
+    addLog('☀️ ' + h.name + '今天精神特別好，心情變成絕好調！');
+  } else if (roll < 0.75) {
+    const key = randPick(STAT_KEYS);
+    h.stats[key] = clamp(h.stats[key] + 2, 10, statCap(h));
+    addLog('💡 ' + h.name + '突然開竅了，' + STAT_LABEL[key] + ' +2！');
+  } else if (roll < 0.88) {
+    h.energy = clamp(h.energy - 20, 0, 100);
+    addLog('🤧 ' + h.name + '有點小感冒，體力 -20');
+  } else {
+    h.mood = clamp(h.mood - 1, 0, 4);
+    addLog('🌧 ' + h.name + '被雷聲嚇到，心情 -1');
+  }
+}
+function advanceWeek() {
+  state.week += 1;
+  if (state.week > 52) {
+    state.week = 1;
+    state.year += 1;
+    state.horses.forEach(h => {
+      if (h.retired) return;
+      h.age += 1;
+      if (h.age >= 5) {
+        STAT_KEYS.forEach(k => { h.stats[k] = clamp(h.stats[k] - 3, 10, 99); });
+        addLog('🍂 ' + h.name + ' ' + h.age + ' 歲了，巔峰已過，全屬性 -3');
+      }
+      if (h.age >= 7) {
+        h.retired = true;
+        addLog('👋 ' + h.name + ' 7 歲引退了，感謝牠的付出！可以在馬房賣出或留作紀念。');
+        if (h.g1wins > 0) {
+          state.hall.push({ name: h.name, g1wins: h.g1wins, wins: h.wins, earnings: h.earnings });
+        }
+      }
+    });
+    showToast('進入第 ' + state.year + ' 年！');
+  }
+  state.shop = [genShopHorse(), genShopHorse(), genShopHorse()];
+  state.shopFreeRefresh = true;
+}
+function afterAction() {
+  const h = activeHorse();
+  weeklyEvent(h);
+  advanceWeek();
+  saveState();
+  renderAll();
+}
+
+/* ================= 比賽 ================= */
+function calcPower(h, race) {
+  const s = h.stats;
+  let base = s.spd * 0.35 + s.sta * 0.25 + s.pow * 0.15 + s.gut * 0.15 + s.wis * 0.10;
+  let fit = 1;
+  if (race.turf === '草') fit *= (h.turf === '草' ? 1.10 : (h.turf === '兩用' ? 1.05 : 0.85));
+  else fit *= (h.turf === '泥' ? 1.10 : (h.turf === '兩用' ? 1.05 : 0.85));
+  fit *= (h.dist === race.distType ? 1.10 : 0.90);
+  const moodMult = [0.90, 0.95, 1.0, 1.05, 1.10][h.mood];
+  return base * fit * moodMult;
+}
+function genOpponent(race) {
+  const p = race.oppBase + randInt(-8, 8);
+  return { name: randPick(OPP_NAMES), power: p, isPlayer: false };
+}
+function calcRaceOutcome(h, race) {
+  const runners = [{ name: h.name, power: calcPower(h, race), isPlayer: true }];
+  for (let i = 0; i < 7; i++) runners.push(genOpponent(race));
+  runners.forEach(r => { r.eff = r.power * (0.92 + Math.random() * 0.16); });
+  runners.sort((a, b) => b.eff - a.eff);
+  runners.forEach((r, i) => { r.rank = i + 1; });
+  const me = runners.find(r => r.isPlayer);
+  return { runners: runners, myRank: me.rank };
+}
+function raceEligible(h, race) {
+  if (!h || h.retired) return '請先選一匹現役馬';
+  if (h.age < race.minAge) return '要 ' + race.minAge + ' 歲才能參加';
+  if (h.wins < race.minWins) return '需要 ' + race.minWins + ' 勝才能報名';
+  if (h.energy < 25) return '體力不足 25，先休息';
+  return null;
+}
+function runRace(raceId) {
+  if (racing) return;
+  const race = RACES.find(r => r.id === raceId);
+  const h = activeHorse();
+  const err = raceEligible(h, race);
+  if (err) { showToast(err); return; }
+  racing = true;
+  h.energy = clamp(h.energy - 25, 0, 100);
+  const outcome = calcRaceOutcome(h, race);
+  const live = $('race-live');
+  live.classList.remove('hidden');
+  live.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・' + race.dist + 'm ' + race.turf + '地進行中…</h2>'
+    + '<div id="race-lanes" class="mt-3">' + outcome.runners.map((r, i) =>
+      '<div class="race-lane"><span class="text-xs font-bold w-16 truncate">' + esc(r.name) + '</span>'
+      + '<div class="race-track"><div class="race-runner" id="lane-' + i + '" style="width:0%;background:' + (r.isPlayer ? '#d9941a' : '#1d6b41') + '">' + (r.isPlayer ? '🐎' : '🏇') + '</div></div>'
+      + '<span class="text-xs font-bold w-8 text-right" id="lane-pos-' + i + '">-</span></div>').join('') + '</div>'
+    + '<p class="text-xs text-[#5c5346] mt-2">正在衝刺…結果由實力、適性、心情與臨場發揮決定</p>';
+  live.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const maxEff = Math.max.apply(null, outcome.runners.map(r => r.eff));
+  const durs = outcome.runners.map(r => 5200 * (maxEff / r.eff));
+  const startAt = Date.now();
+  outcome.runners.forEach((r, i) => {
+    const bar = $('lane-' + i);
+    if (bar) { bar.style.transition = 'width ' + durs[i] + 'ms linear'; requestAnimationFrame(() => { bar.style.width = '100%'; }); }
+  });
+  const posTimer = setInterval(() => {
+    const elapsed = Date.now() - startAt;
+    const prog = durs.map(d => clamp(elapsed / d, 0, 1));
+    outcome.runners.forEach((r, i) => {
+      const pos = $('lane-pos-' + i);
+      if (!pos) return;
+      const cur = prog.map((p, j) => ({ j: j, p: p })).sort((a, b) => b.p - a.p).findIndex(x => x.j === i) + 1;
+      pos.textContent = '第' + cur + '名';
+    });
+  }, 200);
+  const maxDur = 5200 * (maxEff / Math.min.apply(null, outcome.runners.map(r => r.eff)));
+  setTimeout(() => {
+    clearInterval(posTimer);
+    finishRace(h, race, outcome);
+    racing = false;
+  }, maxDur + 700);
+}
+function finishRace(h, race, outcome) {
+  const rank = outcome.myRank;
+  let prize = 0;
+  if (rank === 1) prize = race.prize;
+  else if (rank === 2) prize = Math.round(race.prize * 0.4);
+  else if (rank === 3) prize = Math.round(race.prize * 0.2);
+  h.races += 1;
+  state.totalRaces += 1;
+  if (rank === 1) {
+    h.wins += 1;
+    state.totalWins += 1;
+    if (race.tier === 'G1') h.g1wins += 1;
+    if (race.tier === 'G2') h.g2wins += 1;
+    if (race.tier === 'G3') h.g3wins += 1;
+    h.mood = clamp(h.mood + 1, 0, 4);
+  } else {
+    h.mood = clamp(h.mood - 1, 0, 4);
+  }
+  h.earnings += prize;
+  state.totalEarnings += prize;
+  state.money += prize;
+  addLog('🏆 ' + h.name + '出戰' + race.name + '，第 ' + rank + ' 名' + (prize > 0 ? '，獎金 +' + fmt(prize) : '，無獎金') + '。');
+  const live = $('race-live');
+  live.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・結果</h2>'
+    + '<div class="text-center py-3"><div class="text-3xl font-black ' + (rank === 1 ? 'text-[#d9941a]' : '') + '">第 ' + rank + ' 名</div>'
+    + '<div class="text-sm font-bold mt-1">' + (rank === 1 ? '🎉 冠軍！' : (rank <= 3 ? '👏 進入前三名！' : '下次再接再厲')) + '</div>'
+    + (prize > 0 ? '<div class="text-lg font-black text-[#1d6b41] mt-1">獎金 +' + fmt(prize) + ' 金</div>' : '<div class="text-sm text-[#5c5346] mt-1">這場沒有獎金</div>')
+    + '</div>'
+    + '<div class="text-xs text-[#5c5346] space-y-1 border-t pt-2">' + outcome.runners.map(r => '<div>第' + r.rank + '名　' + esc(r.name) + (r.isPlayer ? '（你）' : '') + '</div>').join('') + '</div>';
+  showToast(rank === 1 ? '冠軍！獎金 +' + fmt(prize) : '第 ' + rank + ' 名' + (prize > 0 ? '，獎金 +' + fmt(prize) : ''));
+  afterAction();
+}
+
+/* ================= 商店 / 馬房操作 ================= */
+function buyHorse(shopIdx) {
+  const h = state.shop[shopIdx];
+  if (!h) return;
+  if (state.horses.filter(x => !x.retired).length >= MAX_STABLE && state.horses.length >= MAX_STABLE) { showToast('馬房滿了（最多 ' + MAX_STABLE + ' 匹），先賣掉或引退一匹'); return; }
+  if (state.horses.length >= MAX_STABLE) { showToast('馬房滿了（最多 ' + MAX_STABLE + ' 匹）'); return; }
+  if (state.money < h.price) { showToast('金不夠，這匹要 ' + fmt(h.price) + ' 金'); return; }
+  state.money -= h.price;
+  const bought = Object.assign({}, h);
+  delete bought.price;
+  state.horses.push(bought);
+  state.activeHorseId = bought.id;
+  state.shop.splice(shopIdx, 1);
+  addLog('🛒 買下「' + bought.name + '」（' + RARITY[bought.rarity].label + '），-' + fmt(h.price) + ' 金');
+  showToast('買下「' + bought.name + '」！');
+  saveState();
+  renderAll();
+}
+function refreshShop() {
+  if (state.shopFreeRefresh) {
+    state.shopFreeRefresh = false;
+    state.shop = [genShopHorse(), genShopHorse(), genShopHorse()];
+    addLog('🛒 市場換了一批馬');
+  } else {
+    if (state.money < 2000) { showToast('金不夠，換一批要 2,000 金'); return; }
+    state.money -= 2000;
+    state.shop = [genShopHorse(), genShopHorse(), genShopHorse()];
+    addLog('🛒 花 2,000 金換了一批馬');
+  }
+  saveState();
+  renderAll();
+}
+function sellHorse(horseId) {
+  const idx = state.horses.findIndex(h => h.id === horseId);
+  if (idx < 0) return;
+  const h = state.horses[idx];
+  const value = Math.round(horsePrice(h) * 0.5) + h.wins * 5000;
+  if (!window.confirm('確定賣掉「' + h.name + '」嗎？可拿回 ' + fmt(value) + ' 金。')) return;
+  state.horses.splice(idx, 1);
+  state.money += value;
+  if (state.activeHorseId === horseId) {
+    const next = state.horses.find(x => !x.retired) || state.horses[0];
+    state.activeHorseId = next ? next.id : null;
+  }
+  addLog('💰 賣掉「' + h.name + '」，+' + fmt(value) + ' 金');
+  showToast('賣掉「' + h.name + '」，+' + fmt(value));
+  saveState();
+  renderAll();
+}
+function resetGame() {
+  if (!window.confirm('確定重新開始嗎？所有馬匹、獎金與紀錄都會清空。')) return;
+  state = createDefaultState();
+  saveState();
+  renderAll();
+  showToast('新牧場開始了！');
+}
+
+/* ================= 渲染 ================= */
+function statBar(label, val, color) {
+  return '<div class="flex items-center gap-2 text-xs"><span class="w-10 font-bold">' + label + '</span>'
+    + '<div class="stat-bar flex-1"><div class="stat-fill" style="width:' + val + '%;background:' + color + '"></div></div>'
+    + '<span class="w-7 text-right font-black">' + val + '</span></div>';
+}
+function rarityTag(rarity) {
+  const r = RARITY[rarity];
+  return '<span class="text-[11px] font-black px-2 py-0.5 rounded-full" style="color:' + r.color + ';border:1px solid ' + r.color + '">' + r.label + '</span>';
+}
+function renderHeader() {
+  $('header-season').textContent = '第 ' + state.year + ' 年・第 ' + state.week + ' 週';
+  $('header-money').textContent = '💰 ' + fmt(state.money);
+  $('header-horses').textContent = '馬房 ' + state.horses.length + '/' + MAX_STABLE;
+}
+function renderStable() {
+  $('stable-count').textContent = '點一匹馬設為主力';
+  $('stable-list').innerHTML = state.horses.map(h => {
+    const active = h.id === state.activeHorseId;
+    return '<button type="button" data-horse="' + h.id + '" class="w-full text-left p-3 rounded-xl border-2 ' + (active ? 'border-[#d9941a] bg-[#fff8e6]' : 'border-[#e6dcc5] bg-white') + '">'
+      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + (active ? '⭐ ' : '') + esc(h.name) + (h.retired ? '（已引退）' : '') + '</span>' + rarityTag(h.rarity) + '</div>'
+      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・戰績 ' + h.wins + '勝/' + h.races + '戰・獎金 ' + fmt(h.earnings) + '</div>'
+      + '</button>';
+  }).join('');
+  document.querySelectorAll('[data-horse]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.activeHorseId = btn.getAttribute('data-horse');
+      saveState();
+      renderAll();
+    });
+  });
+  const h = activeHorse();
+  const detail = $('horse-detail');
+  if (!h) { detail.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的，去商店買一匹馬吧。</p>'; return; }
+  const cap = statCap(h);
+  detail.innerHTML = '<div class="flex items-start gap-3">'
+    + '<img src="assets/horse-bay.webp" alt="賽馬" class="w-24 h-24 object-cover rounded-xl border border-[#d8cbb3]" onerror="this.style.display=\'none\'">'
+    + '<div class="flex-1"><div class="flex items-center gap-2 flex-wrap"><span class="font-black text-base">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
+    + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離</div>'
+    + '<div class="text-xs mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b></div>'
+    + '<div class="text-xs mt-1">戰績 <b>' + h.wins + '勝 / ' + h.races + '戰</b>・累積獎金 <b>' + fmt(h.earnings) + '</b>・G1 冠軍 <b>' + h.g1wins + '</b> 次</div></div></div>'
+    + '<div class="space-y-1.5 mt-3">'
+    + statBar('速度', h.stats.spd, '#d9941a') + statBar('耐力', h.stats.sta, '#1d6b41')
+    + statBar('力量', h.stats.pow, '#9e2a22') + statBar('根性', h.stats.gut, '#1d4ed8')
+    + statBar('智慧', h.stats.wis, '#7c3aed') + '</div>'
+    + '<p class="text-[11px] text-[#5c5346] mt-2">' + RARITY[h.rarity].label + '馬成長上限 ' + cap + '。' + (h.retired ? '已引退，不能再訓練或比賽。' : (h.age >= 5 ? '已過巔峰期，每年全屬性 -3。' : '巔峰期在 3～4 歲，把握黃金時間。')) + '</p>'
+    + '<button type="button" id="btn-sell-horse" class="paper-btn text-xs px-3 py-2 mt-3">賣掉這匹馬</button>';
+  $('btn-sell-horse').addEventListener('click', () => sellHorse(h.id));
+}
+function renderTrain() {
+  const h = activeHorse();
+  const sum = $('train-horse-summary');
+  if (!h) { sum.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的。</p>'; $('train-actions').innerHTML = ''; return; }
+  sum.innerHTML = '<div class="flex items-center justify-between"><span class="font-black">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
+    + '<div class="text-xs text-[#5c5346] mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b>・' + h.age + '歲・戰績 ' + h.wins + '勝/' + h.races + '戰</div>'
+    + '<div class="stat-bar mt-2"><div class="stat-fill" style="width:' + h.energy + '%;background:' + (h.energy < 25 ? '#9e2a22' : '#1d6b41') + '"></div></div>';
+  const acts = [
+    { label: '速度訓練', sub: '體力 -18', fn: () => doTrain('spd'), cls: 'gold-btn' },
+    { label: '耐力訓練', sub: '體力 -18', fn: () => doTrain('sta'), cls: 'gold-btn' },
+    { label: '力量訓練', sub: '體力 -18', fn: () => doTrain('pow'), cls: 'gold-btn' },
+    { label: '根性訓練', sub: '體力 -18', fn: () => doTrain('gut'), cls: 'gold-btn' },
+    { label: '智慧訓練', sub: '體力 -18', fn: () => doTrain('wis'), cls: 'gold-btn' },
+    { label: '休息', sub: '體力 +35', fn: doRest, cls: 'green-btn' },
+    { label: '散步', sub: '心情 +1・體力 +12', fn: doWalk, cls: 'green-btn' },
+    { label: '特級飼料', sub: '800 金・體力 +25', fn: doFeed, cls: 'ink-btn' },
+  ];
+  $('train-actions').innerHTML = acts.map((a, i) =>
+    '<button type="button" data-act="' + i + '" class="' + a.cls + ' px-2 py-3 text-sm">' + a.label + '<div class="text-[11px] font-bold opacity-80">' + a.sub + '</div></button>').join('');
+  document.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => { acts[Number(btn.getAttribute('data-act'))].fn(); });
+  });
+  $('train-log').innerHTML = state.logs.slice(0, 8).map(l => '<div><span class="text-[#9a8f7a]">' + esc(l.week) + '</span>　' + esc(l.text) + '</div>').join('');
+}
+function renderRace() {
+  const h = activeHorse();
+  $('race-list').innerHTML = RACES.map(race => {
+    const err = raceEligible(h, race);
+    return '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white">'
+      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + esc(race.name) + '</span><span class="text-xs font-black text-[#d9941a]">獎金 ' + fmt(race.prize) + '</span></div>'
+      + '<div class="text-xs text-[#5c5346] mt-1">' + race.dist + 'm・' + race.turf + '地・' + race.distType + '距離・需 ' + race.minAge + ' 歲・' + race.minWins + ' 勝以上</div>'
+      + '<button type="button" data-race="' + race.id + '" class="gold-btn text-sm px-4 py-2 mt-2 w-full"' + (err ? ' disabled style="opacity:.45"' : '') + '>'
+      + (err ? esc(err) : '報名出賽（體力 -25）') + '</button></div>';
+  }).join('');
+  document.querySelectorAll('[data-race]').forEach(btn => {
+    btn.addEventListener('click', () => runRace(btn.getAttribute('data-race')));
+  });
+  $('race-records').innerHTML = state.logs.filter(l => l.text.indexOf('出戰') === 0 || l.text.indexOf('🏆') === 0).slice(0, 8)
+    .map(l => '<div><span class="text-[#9a8f7a]">' + esc(l.week) + '</span>　' + esc(l.text) + '</div>').join('')
+    || '<div>還沒有出賽紀錄，先去育成練一週再來報名新馬戰。</div>';
+}
+function renderShop() {
+  $('btn-refresh-shop').textContent = state.shopFreeRefresh ? '換一批（本週免費）' : '換一批（2,000 金）';
+  $('shop-list').innerHTML = state.shop.map((h, i) => {
+    return '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white">'
+      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
+      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離</div>'
+      + '<div class="grid grid-cols-5 gap-1 mt-2 text-center text-[11px]">'
+      + STAT_KEYS.map(k => '<div class="bg-[#f4ede0] rounded-lg py-1"><div class="font-bold">' + STAT_LABEL[k] + '</div><div class="font-black">' + h.stats[k] + '</div></div>').join('')
+      + '</div>'
+      + '<button type="button" data-buy="' + i + '" class="green-btn text-sm px-4 py-2 mt-2 w-full">買下・' + fmt(h.price) + ' 金</button></div>';
+  }).join('') || '<p class="text-sm text-[#5c5346]">市場本週沒有馬了。</p>';
+  document.querySelectorAll('[data-buy]').forEach(btn => {
+    btn.addEventListener('click', () => buyHorse(Number(btn.getAttribute('data-buy'))));
+  });
+}
+function renderHall() {
+  $('hall-list').innerHTML = state.hall.length
+    ? state.hall.map(h => '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white"><span class="font-black text-sm">👑 ' + esc(h.name) + '</span><div class="text-xs text-[#5c5346] mt-1">G1 冠軍 ' + h.g1wins + ' 次・生涯 ' + h.wins + ' 勝・累積獎金 ' + fmt(h.earnings) + '</div></div>').join('')
+    : '<p class="text-sm text-[#5c5346]">還沒有馬進名人堂。贏下一場 G1，名字就會刻在這裡。</p>';
+  $('farm-stats').innerHTML =
+    '<div>出賽 <b>' + state.totalRaces + '</b> 場・勝利 <b>' + state.totalWins + '</b> 場・累積獎金 <b>' + fmt(state.totalEarnings) + '</b></div>'
+    + '<div>現役馬 <b>' + state.horses.filter(h => !h.retired).length + '</b> 匹・引退馬 <b>' + state.horses.filter(h => h.retired).length + '</b> 匹</div>'
+    + '<div>存檔在本機瀏覽器（天駒養成錄 v1）。</div>'
+    + '<button type="button" id="btn-reset" class="paper-btn text-xs px-3 py-2 mt-2">重新開始</button>';
+  $('btn-reset').addEventListener('click', resetGame);
+}
+function renderAll() {
+  renderHeader();
+  renderStable();
+  renderTrain();
+  renderRace();
+  renderShop();
+  renderHall();
+}
+function switchView(view) {
+  currentView = view;
+  ['stable', 'train', 'race', 'shop', 'hall'].forEach(v => {
+    $('view-' + v).classList.toggle('hidden', v !== view);
+  });
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+  });
+  window.scrollTo({ top: 0 });
+}
+function init() {
+  const saved = loadState();
+  state = saved || createDefaultState();
+  if (!saved) saveState();
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+  });
+  $('btn-refresh-shop').addEventListener('click', refreshShop);
+  renderAll();
+}
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
