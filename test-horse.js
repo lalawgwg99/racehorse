@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -484,6 +484,34 @@ const rF = T.drawGacha(10);
 t('T31 滿房馬不增加', T.state.horses.length === 6, T.state.horses.length);
 t('T31 滿房抽到的馬全賣掉換金', rF.every(r => r.kind !== 'horse' || r.kept === false) && T.state.money > mBefore - 90000, T.state.money);
 unmock();
+
+// --- T32 打工賺錢 ---
+T.state = T.createDefaultState();
+T.state.money = 0;
+h = T.state.horses[0]; h.energy = 50;
+mockRandom(0.5);
+T.doWork();
+t('T32 打工+10000', T.state.money === 10000, T.state.money);
+t('T32 打工體力+15', h.energy === 65, h.energy);
+unmock();
+T.state.horses = []; T.state.activeHorseId = null; T.state.money = 0;
+mockRandom(0.5);
+let workOk = true;
+try { T.doWork(); } catch (e) { workOk = false; }
+t('T32 沒馬也能打工', workOk && T.state.money === 10000, T.state.money);
+unmock();
+
+// --- T33 破產紓困金 ---
+T.state = T.createDefaultState();
+T.state.money = 5000; T.state.week = 1;
+T.advanceWeek();
+t('T33 金低於10000補助5000', T.state.money === 10000, T.state.money);
+T.state.money = 10000; T.state.week = 1;
+T.advanceWeek();
+t('T33 金夠不補助', T.state.money === 10000, T.state.money);
+T.state.money = 0; T.state.week = 1;
+T.advanceWeek();
+t('T33 歸零也補助', T.state.money === 5000, T.state.money);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

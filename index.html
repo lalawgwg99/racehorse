@@ -544,6 +544,15 @@ function doFeed() {
   sfx('coin');
   afterAction();
 }
+function doWork() {
+  const h = activeHorse();
+  state.money += 10000;
+  if (h && !h.retired) h.energy = clamp(h.energy + 15, 0, 100);
+  addLog('💼 去馬場打工一週，賺了 10,000 金' + (h && !h.retired ? '（' + h.name + '體力 +15）' : ''));
+  showToast('打工 +10,000 金！');
+  sfx('coin');
+  afterAction();
+}
 
 /* ================= 週次推進 ================= */
 function weeklyEvent(h) {
@@ -570,6 +579,10 @@ function weeklyEvent(h) {
 }
 function advanceWeek() {
   state.week += 1;
+  if (state.money < 10000) {
+    state.money += 5000;
+    addLog('🆘 馬場紓困金：金低於 10,000，補助 5,000 金。');
+  }
   if (state.week > 52) {
     state.week = 1;
     state.year += 1;
@@ -1184,10 +1197,17 @@ function renderBreedPanel() {
 function renderTrain() {
   const h = activeHorse();
   const sum = $('train-horse-summary');
-  if (!h) { sum.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的。</p>'; $('train-actions').innerHTML = ''; return; }
+  if (!h) {
+    sum.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的，去商店買一匹馬吧。沒錢的話先打工賺錢。</p>';
+    $('train-actions').innerHTML = '<button type="button" id="btn-work-only" class="green-btn px-2 py-3 text-sm w-full">💼 打工賺錢<div class="text-[11px] font-bold opacity-80">+10,000 金／週</div></button>';
+    $('btn-work-only').addEventListener('click', doWork);
+    $('train-log').innerHTML = state.logs.slice(0, 8).map(l => '<div><span class="text-[#9a8f7a]">' + esc(l.week) + '</span>　' + esc(l.text) + '</div>').join('');
+    return;
+  }
   sum.innerHTML = '<div class="flex items-center justify-between"><span class="font-black">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
     + '<div class="text-xs text-[#5c5346] mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b>・' + h.age + '歲・戰績 ' + h.wins + '勝/' + h.races + '戰</div>'
-    + '<div class="stat-bar mt-2"><div class="stat-fill" style="width:' + h.energy + '%;background:' + (h.energy < 25 ? '#9e2a22' : '#1d6b41') + '"></div></div>';
+    + '<div class="stat-bar mt-2"><div class="stat-fill" style="width:' + h.energy + '%;background:' + (h.energy < 25 ? '#9e2a22' : '#1d6b41') + '"></div></div>'
+    + (state.money < 10000 ? '<p class="text-xs font-bold text-[#9e2a22] mt-1">💡 金不多了：打工賺 10,000 金／週，或賣馬換金。</p>' : '');
   const acts = [
     { label: '速度訓練', sub: '體力 -22', fn: () => doTrain('spd'), cls: 'gold-btn' },
     { label: '耐力訓練', sub: '體力 -22', fn: () => doTrain('sta'), cls: 'gold-btn' },
@@ -1197,6 +1217,7 @@ function renderTrain() {
     { label: '休息', sub: '體力 +35（上限 100）', fn: doRest, cls: 'green-btn' },
     { label: '散步', sub: '心情 +1・體力 +12', fn: doWalk, cls: 'green-btn' },
     { label: '特級飼料', sub: '800 金・體力 +25', fn: doFeed, cls: 'ink-btn' },
+    { label: '💼 打工', sub: '+10,000 金・體力 +15', fn: doWork, cls: 'green-btn' },
   ];
   $('train-actions').innerHTML = acts.map((a, i) =>
     '<button type="button" data-act="' + i + '" class="' + a.cls + ' px-2 py-3 text-sm">' + a.label + '<div class="text-[11px] font-bold opacity-80">' + a.sub + '</div></button>').join('');
