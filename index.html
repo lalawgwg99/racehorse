@@ -15,8 +15,9 @@
   .green-btn:active { transform: translateY(1px); box-shadow: none; }
   .ink-btn { background: #1e1a16; color: #fdfbf3; font-weight: 800; border-radius: .75rem; }
   .paper-btn { background: #f4ede0; color: #5c5346; font-weight: 700; border: 1px solid #d8cbb3; border-radius: .75rem; }
-  .nav-btn { flex: 1; padding: .6rem 0 .7rem; font-size: 13px; font-weight: 800; color: #b8a686; text-align: center; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .7rem 0 calc(.8rem + env(safe-area-inset-bottom)); min-height: 64px; font-size: 13px; font-weight: 800; color: #b8a686; text-align: center; }
   .nav-btn.active { color: #f6c453; }
+  .nav-ico { font-size: 24px; line-height: 1; }
   .stat-bar { height: .5rem; background: #e6dcc5; border-radius: 999px; overflow: hidden; }
   .stat-fill { height: 100%; border-radius: 999px; transition: width .3s; }
   .mood-4 { color: #d9941a; } .mood-3 { color: #1d6b41; } .mood-2 { color: #5c5346; } .mood-1 { color: #9e2a22; } .mood-0 { color: #9e2a22; }
@@ -50,15 +51,18 @@
         <div class="text-[#f6c453] font-black text-lg leading-none">🐎 天駒養成錄</div>
         <div id="header-season" class="text-[#b8d8a8] text-xs mt-1">第 1 年・第 1 週</div>
       </div>
-      <div class="text-right">
-        <div id="header-money" class="text-[#f6c453] font-black text-lg leading-none">💰 100,000</div>
-        <div id="header-horses" class="text-[#b8d8a8] text-xs mt-1">馬房 1/6</div>
+      <div class="text-right flex items-start gap-2">
+        <div>
+          <div id="header-money" class="text-[#f6c453] font-black text-lg leading-none">💰 100,000</div>
+          <div id="header-horses" class="text-[#b8d8a8] text-xs mt-1">馬房 1/6</div>
+        </div>
+        <button id="btn-mute" type="button" class="text-xl leading-none px-2 py-1.5 rounded-lg" style="background:rgba(246,196,83,.15)" title="音效開關">🔊</button>
       </div>
     </div>
     <div id="toast-banner" class="hidden mt-2 text-center text-xs font-bold text-[#3a2503] bg-[#f6c453] rounded-lg px-3 py-2"></div>
   </header>
 
-  <main class="flex-1 px-3 space-y-3">
+  <main class="flex-1 px-3 space-y-3 pb-6">
     <!-- 馬房 -->
     <section id="view-stable" class="space-y-3">
       <div class="card p-4">
@@ -130,11 +134,11 @@
   <!-- 底部導覽 -->
   <nav class="fixed bottom-0 left-0 right-0 z-20" style="background:#0a1f13">
     <div class="max-w-md mx-auto flex">
-      <button type="button" class="nav-btn active" data-view="stable">🏇 馬房</button>
-      <button type="button" class="nav-btn" data-view="train">🌱 育成</button>
-      <button type="button" class="nav-btn" data-view="race">🏆 比賽</button>
-      <button type="button" class="nav-btn" data-view="shop">🛒 商店</button>
-      <button type="button" class="nav-btn" data-view="hall">👑 名人堂</button>
+      <button type="button" class="nav-btn active" data-view="stable"><span class="nav-ico">🏇</span><span>馬房</span></button>
+      <button type="button" class="nav-btn" data-view="train"><span class="nav-ico">🌱</span><span>育成</span></button>
+      <button type="button" class="nav-btn" data-view="race"><span class="nav-ico">🏆</span><span>比賽</span></button>
+      <button type="button" class="nav-btn" data-view="shop"><span class="nav-ico">🛒</span><span>商店</span></button>
+      <button type="button" class="nav-btn" data-view="hall"><span class="nav-ico">👑</span><span>名人堂</span></button>
     </div>
   </nav>
 </div>
@@ -194,6 +198,49 @@ function randPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function uid() { return 'h' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+/* ================= 音效（WebAudio 合成，無外部檔案） ================= */
+let audioCtx = null;
+function isMuted() {
+  try { return localStorage.getItem('tianju_muted') === '1'; } catch (e) { return false; }
+}
+function setMuted(m) {
+  try { localStorage.setItem('tianju_muted', m ? '1' : '0'); } catch (e) { /* 忽略 */ }
+  const btn = $('btn-mute');
+  if (btn) btn.textContent = m ? '🔇' : '🔊';
+}
+function tone(freq, dur, type, vol, when) {
+  const AC = (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext));
+  if (!AC || isMuted()) return;
+  try {
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t0 = audioCtx.currentTime + (when || 0);
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.12, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start(t0);
+    o.stop(t0 + dur + 0.05);
+  } catch (e) { /* 瀏覽器不支援就靜音 */ }
+}
+function sfx(kind) {
+  if (isMuted()) return;
+  if (kind === 'tap') tone(660, 0.07, 'square', 0.05);
+  else if (kind === 'train') { tone(520, 0.09, 'sine', 0.1); tone(780, 0.12, 'sine', 0.1, 0.09); }
+  else if (kind === 'coin') { tone(950, 0.08, 'sine', 0.12); tone(1420, 0.16, 'sine', 0.12, 0.08); }
+  else if (kind === 'win') { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.14, i * 0.11)); }
+  else if (kind === 'lose') { tone(320, 0.2, 'sine', 0.1); tone(210, 0.3, 'sine', 0.1, 0.18); }
+  else if (kind === 'whistle') { tone(2200, 0.12, 'sine', 0.07); tone(2200, 0.2, 'sine', 0.07, 0.16); }
+  else if (kind === 'foal') { tone(880, 0.1, 'triangle', 0.1); tone(1175, 0.1, 'triangle', 0.1, 0.1); tone(1568, 0.2, 'triangle', 0.1, 0.2); }
+  else if (kind === 'count') tone(880, 0.09, 'sine', 0.1);
+  else if (kind === 'go') { tone(1047, 0.2, 'triangle', 0.14); tone(1568, 0.3, 'triangle', 0.12, 0.12); }
+}
 
 /* ================= 狀態 ================= */
 let state = null;
@@ -389,25 +436,35 @@ function showToast(text) {
 
 /* ================= 育成 ================= */
 function statCap(h) { return RARITY[h.rarity].cap; }
+function trainFailRate(h, statKey) {
+  return Math.min(0.20, 0.08 + 0.12 * (h.stats[statKey] / statCap(h)));
+}
+function trainGain(h, statKey, base) {
+  let mult = 1 - 0.6 * (h.stats[statKey] / statCap(h));
+  if (h.lastTrain === statKey) mult *= 0.75;
+  return Math.max(1, Math.round(base * mult));
+}
 function doTrain(statKey) {
   const h = activeHorse();
   if (!h || h.retired) { showToast('請先在馬房選一匹現役馬'); return; }
-  if (h.energy < 18) { showToast('體力不足，先休息或餵食'); return; }
-  h.energy = clamp(h.energy - 18, 0, 100);
-  if (Math.random() < 0.08) {
+  if (h.energy < 22) { showToast('體力不足，先休息或餵食'); return; }
+  h.energy = clamp(h.energy - 22, 0, 100);
+  if (Math.random() < trainFailRate(h, statKey)) {
     h.energy = clamp(h.energy - 10, 0, 100);
     h.mood = clamp(h.mood - 1, 0, 4);
     addLog(h.name + '訓練失敗，狀態有點低落…（體力 -10）');
     showToast('訓練失敗！' + h.name + '有點低落');
   } else {
-    let gain = randInt(2, 4) + (h.mood >= 3 ? 1 : 0);
+    let gain = trainGain(h, statKey, randInt(2, 4) + (h.mood >= 3 ? 1 : 0));
     const cap = statCap(h);
     const before = h.stats[statKey];
     h.stats[statKey] = clamp(h.stats[statKey] + gain, 10, cap);
     const real = h.stats[statKey] - before;
-    addLog(h.name + STAT_LABEL[statKey] + '訓練：' + before + ' → ' + h.stats[statKey] + (real < gain ? '（已達' + RARITY[h.rarity].label + '上限 ' + cap + '）' : '') + '，體力 -18');
+    addLog(h.name + STAT_LABEL[statKey] + '訓練：' + before + ' → ' + h.stats[statKey] + (real < gain ? '（已達' + RARITY[h.rarity].label + '上限 ' + cap + '）' : '') + (h.lastTrain === statKey ? '（連續同項，效果打折）' : '') + '，體力 -22');
     showToast(STAT_LABEL[statKey] + ' +' + real + '！');
+    sfx('train');
   }
+  h.lastTrain = statKey;
   afterAction();
 }
 function doRest() {
@@ -417,6 +474,7 @@ function doRest() {
   h.energy = clamp(h.energy + 35, 0, 100);
   addLog(h.name + '好好休息了一週，體力 ' + before + ' → ' + h.energy);
   showToast('體力 +' + (h.energy - before));
+  sfx('tap');
   afterAction();
 }
 function doWalk() {
@@ -440,6 +498,7 @@ function doFeed() {
   h.stats[key] = clamp(h.stats[key] + 1, 10, statCap(h));
   addLog(h.name + '吃了特級飼料（-800 金），體力 +25，' + STAT_LABEL[key] + ' ' + before + ' → ' + h.stats[key]);
   showToast('體力 +25，' + STAT_LABEL[key] + ' +1');
+  sfx('coin');
   afterAction();
 }
 
@@ -534,6 +593,49 @@ function raceEligible(h, race) {
   if (h.energy < 25) return '體力不足 25，先休息';
   return null;
 }
+function startRaceAnimation(race, outcome, onFinish) {
+  const live = $('race-live');
+  live.classList.remove('hidden');
+  const counts = ['3', '2', '1', '跑！'];
+  let ci = 0;
+  live.innerHTML = '<div class="text-center py-10"><div id="count-num" class="text-7xl font-black text-[#1d4d2e]">3</div><div class="text-sm text-[#5c5346] mt-2">預備…</div></div>';
+  live.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  sfx('count');
+  const cdTimer = setInterval(() => {
+    ci++;
+    if (ci >= counts.length) { clearInterval(cdTimer); sfx('go'); runScene(); return; }
+    const el = $('count-num');
+    if (el) el.textContent = counts[ci];
+    sfx('count');
+  }, 1000);
+  function runScene() {
+    live.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・' + race.dist + 'm ' + race.turf + '地進行中…</h2>'
+      + '<div class="race-scene mt-3"><div class="race-flag"></div>' + outcome.runners.map((r, i) =>
+        '<div class="race-lane-row"><span class="lane-name">' + esc(r.name) + '</span>'
+        + '<div class="race-token' + (r.isPlayer ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + (r.isPlayer ? '<img src="assets/horse-bay.webp" alt="">' : '🐎') + '</div>'
+        + '<span class="lane-pos" id="lane-pos-' + i + '">-</span></div>').join('') + '</div>'
+      + '<p class="text-xs text-[#5c5346] mt-2">正在衝刺…結果由實力、裝備、騎師、適性、心情與臨場發揮決定</p>';
+    const maxEff = Math.max.apply(null, outcome.runners.map(r => r.eff));
+    const durs = outcome.runners.map(r => Math.min(7000, 5200 * (maxEff / r.eff)));
+    const startAt = Date.now();
+    outcome.runners.forEach((r, i) => {
+      const tok = $('lane-' + i);
+      if (tok) { tok.style.transition = 'left ' + durs[i] + 'ms linear'; requestAnimationFrame(() => { tok.style.left = '92%'; }); }
+    });
+    const posTimer = setInterval(() => {
+      const elapsed = Date.now() - startAt;
+      const prog = durs.map(d => clamp(elapsed / d, 0, 1));
+      outcome.runners.forEach((r, i) => {
+        const pos = $('lane-pos-' + i);
+        if (!pos) return;
+        const cur = prog.map((p, j) => ({ j: j, p: p })).sort((a, b) => b.p - a.p).findIndex(x => x.j === i) + 1;
+        pos.textContent = '第' + cur + '名';
+      });
+    }, 200);
+    const maxDur = 5200 * (maxEff / Math.min.apply(null, outcome.runners.map(r => r.eff)));
+    setTimeout(() => { clearInterval(posTimer); onFinish(); }, Math.min(7000, maxDur) + 700);
+  }
+}
 function runRace(raceId) {
   if (racing) return;
   const race = RACES.find(r => r.id === raceId);
@@ -541,6 +643,7 @@ function runRace(raceId) {
   const err = raceEligible(h, race);
   if (err) { showToast(err); return; }
   racing = true;
+  sfx('whistle');
   h.energy = clamp(h.energy - 25, 0, 100);
   const jock = activeJockey();
   if (jock) {
@@ -549,38 +652,7 @@ function runRace(raceId) {
     state.money -= fee;
   }
   const outcome = calcRaceOutcome(h, race);
-  const live = $('race-live');
-  live.classList.remove('hidden');
-  live.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・' + race.dist + 'm ' + race.turf + '地進行中…</h2>'
-    + '<div class="race-scene mt-3"><div class="race-flag"></div>' + outcome.runners.map((r, i) =>
-      '<div class="race-lane-row"><span class="lane-name">' + esc(r.name) + '</span>'
-      + '<div class="race-token' + (r.isPlayer ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + (r.isPlayer ? '<img src="assets/horse-bay.webp" alt="">' : '🐎') + '</div>'
-      + '<span class="lane-pos" id="lane-pos-' + i + '">-</span></div>').join('') + '</div>'
-    + '<p class="text-xs text-[#5c5346] mt-2">正在衝刺…結果由實力、裝備、騎師、適性、心情與臨場發揮決定</p>';
-  live.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  const maxEff = Math.max.apply(null, outcome.runners.map(r => r.eff));
-  const durs = outcome.runners.map(r => Math.min(7000, 5200 * (maxEff / r.eff)));
-  const startAt = Date.now();
-  outcome.runners.forEach((r, i) => {
-    const tok = $('lane-' + i);
-    if (tok) { tok.style.transition = 'left ' + durs[i] + 'ms linear'; requestAnimationFrame(() => { tok.style.left = '92%'; }); }
-  });
-  const posTimer = setInterval(() => {
-    const elapsed = Date.now() - startAt;
-    const prog = durs.map(d => clamp(elapsed / d, 0, 1));
-    outcome.runners.forEach((r, i) => {
-      const pos = $('lane-pos-' + i);
-      if (!pos) return;
-      const cur = prog.map((p, j) => ({ j: j, p: p })).sort((a, b) => b.p - a.p).findIndex(x => x.j === i) + 1;
-      pos.textContent = '第' + cur + '名';
-    });
-  }, 200);
-  const maxDur = 5200 * (maxEff / Math.min.apply(null, outcome.runners.map(r => r.eff)));
-  setTimeout(() => {
-    clearInterval(posTimer);
-    finishRace(h, race, outcome);
-    racing = false;
-  }, maxDur + 700);
+  startRaceAnimation(race, outcome, () => { finishRace(h, race, outcome); racing = false; });
 }
 function finishRace(h, race, outcome) {
   const rank = outcome.myRank;
@@ -636,6 +708,8 @@ function finishRace(h, race, outcome) {
     + '</div>'
     + '<div class="text-xs text-[#5c5346] space-y-1 border-t pt-2">' + outcome.runners.map(r => '<div>第' + r.rank + '名　' + esc(r.name) + (r.isPlayer ? '（你）' : '') + '</div>').join('') + '</div>';
   showToast(rank === 1 ? '冠軍！獎金 +' + fmt(prize) : '第 ' + rank + ' 名' + (prize > 0 ? '，獎金 +' + fmt(prize) : ''));
+  sfx(rank === 1 ? 'win' : 'lose');
+  if (prize > 0) sfx('coin');
   afterAction();
 }
 
@@ -654,6 +728,7 @@ function buyHorse(shopIdx) {
   state.shop.splice(shopIdx, 1);
   addLog('🛒 買下「' + bought.name + '」（' + RARITY[bought.rarity].label + '），-' + fmt(h.price) + ' 金');
   showToast('買下「' + bought.name + '」！');
+  sfx('coin');
   saveState();
   renderAll();
 }
@@ -770,6 +845,7 @@ function breed(sireId, damId) {
   state.activeHorseId = foal.id;
   addLog('🐴 ' + sire.name + ' × ' + dam.name + ' 產駒「' + foal.name + '」（' + RARITY[foal.rarity].label + '）' + mutated + '，配種費 -' + fmt(BREED_COST));
   showToast('產駒「' + foal.name + '」！' + mutated);
+  sfx('foal');
   saveState();
   renderAll();
 }
@@ -800,6 +876,7 @@ function setBet(raceId, type, amount) {
   state.pendingBet = { raceId: raceId, type: type, amount: amount, winOdds: odds.win, placeOdds: odds.place };
   addLog('🎲 下注' + race.name + '「' + (type === 'win' ? '獨贏' : '位置') + '」' + fmt(amount) + ' 金（賠率 ' + (type === 'win' ? odds.win : odds.place) + '）');
   showToast('已下注，開賽見真章');
+  sfx('coin');
   saveState();
   renderAll();
 }
@@ -808,6 +885,81 @@ function cancelBet() {
   state.money += state.pendingBet.amount;
   addLog('🎲 取消下注，退回 ' + fmt(state.pendingBet.amount) + ' 金');
   state.pendingBet = null;
+  saveState();
+  renderAll();
+}
+
+/* ================= 觀賽下注（不參賽，押 NPC 賽事） ================= */
+let specField = null;
+function genSpectateField(race) {
+  const pool = OPP_NAMES.slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+  const runners = [];
+  let sum = 0;
+  for (let i = 0; i < 8; i++) {
+    const power = race.oppBase + randInt(-8, 8);
+    runners.push({ name: pool[i], power: power, isPlayer: false });
+    sum += power;
+  }
+  runners.forEach(r => {
+    r.winOdds = clamp(Math.round((sum / r.power) * 10) / 10, 1.2, 12);
+    r.placeOdds = Math.max(1.1, Math.round(r.winOdds * 0.35 * 10) / 10);
+  });
+  return { raceId: race.id, runners: runners };
+}
+function placeSpectateBet() {
+  if (racing) return;
+  const raceId = $('spec-race').value;
+  const race = RACES.find(r => r.id === raceId);
+  if (!race || !specField || specField.raceId !== raceId) { showToast('請先選一場賽事'); return; }
+  const pickIdx = Number($('spec-horse').value);
+  const type = $('spec-type').value;
+  const amount = Number($('spec-amount').value);
+  const pick = specField.runners[pickIdx];
+  if (!pick) return;
+  if (state.money < amount) { showToast('金不夠，下注要 ' + fmt(amount) + ' 金'); return; }
+  state.money -= amount;
+  sfx('coin');
+  addLog('👀 觀賽下注' + race.name + '「' + pick.name + '・' + (type === 'win' ? '獨贏' : '位置') + '」' + fmt(amount) + ' 金（賠率 ' + (type === 'win' ? pick.winOdds : pick.placeOdds) + '）');
+  runSpectateRace(race, pickIdx, type, amount);
+}
+function runSpectateRace(race, pickIdx, type, amount) {
+  racing = true;
+  sfx('whistle');
+  const runners = specField.runners.map(r => ({ name: r.name, power: r.power, isPlayer: false }));
+  runners.forEach(r => { r.eff = r.power * (0.92 + Math.random() * 0.16); });
+  runners.sort((a, b) => b.eff - a.eff);
+  runners.forEach((r, i) => { r.rank = i + 1; });
+  const outcome = { runners: runners, myRank: runners.find(r => r.name === specField.runners[pickIdx].name).rank };
+  startRaceAnimation(race, outcome, () => { finishSpectateRace(race, outcome, pickIdx, type, amount); racing = false; });
+}
+function finishSpectateRace(race, outcome, pickIdx, type, amount) {
+  const pickName = specField.runners[pickIdx].name;
+  const pick = outcome.runners.find(r => r.name === pickName);
+  const rank = pick ? pick.rank : 8;
+  const odds = type === 'win' ? specField.runners[pickIdx].winOdds : specField.runners[pickIdx].placeOdds;
+  let winAmt = 0;
+  if (type === 'win' && rank === 1) winAmt = Math.round(amount * odds);
+  if (type === 'place' && rank <= 3) winAmt = Math.round(amount * odds);
+  if (winAmt > 0) {
+    state.money += winAmt;
+    addLog('👀 觀賽下注命中！「' + pickName + '」第 ' + rank + ' 名，' + fmt(amount) + ' 金 × ' + odds + ' = +' + fmt(winAmt));
+    showToast('下注中了！+' + fmt(winAmt));
+    sfx('win');
+    sfx('coin');
+  } else {
+    addLog('👀 觀賽下注沒中，「' + pickName + '」第 ' + rank + ' 名，-' + fmt(amount) + ' 金');
+    showToast('沒中，下次再來');
+    sfx('lose');
+  }
+  specField = null;
+  const live = $('race-live');
+  live.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・觀賽結果</h2>'
+    + '<div class="text-center py-3"><div class="text-3xl font-black ' + (winAmt > 0 ? 'text-[#d9941a]' : '') + '">你押的「' + esc(pickName) + '」第 ' + rank + ' 名</div>'
+    + (winAmt > 0 ? '<div class="text-lg font-black text-[#1d6b41] mt-1">派彩 +' + fmt(winAmt) + ' 金</div>' : '<div class="text-sm text-[#5c5346] mt-1">這注沒中</div>')
+    + '</div>'
+    + '<div class="text-xs text-[#5c5346] space-y-1 border-t pt-2">' + outcome.runners.map(r => '<div>第' + r.rank + '名　' + esc(r.name) + (r.name === pickName ? '（你押的）' : '') + '</div>').join('') + '</div>';
+  advanceWeek();
   saveState();
   renderAll();
 }
@@ -921,11 +1073,11 @@ function renderTrain() {
     + '<div class="text-xs text-[#5c5346] mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b>・' + h.age + '歲・戰績 ' + h.wins + '勝/' + h.races + '戰</div>'
     + '<div class="stat-bar mt-2"><div class="stat-fill" style="width:' + h.energy + '%;background:' + (h.energy < 25 ? '#9e2a22' : '#1d6b41') + '"></div></div>';
   const acts = [
-    { label: '速度訓練', sub: '體力 -18', fn: () => doTrain('spd'), cls: 'gold-btn' },
-    { label: '耐力訓練', sub: '體力 -18', fn: () => doTrain('sta'), cls: 'gold-btn' },
-    { label: '力量訓練', sub: '體力 -18', fn: () => doTrain('pow'), cls: 'gold-btn' },
-    { label: '根性訓練', sub: '體力 -18', fn: () => doTrain('gut'), cls: 'gold-btn' },
-    { label: '智慧訓練', sub: '體力 -18', fn: () => doTrain('wis'), cls: 'gold-btn' },
+    { label: '速度訓練', sub: '體力 -22', fn: () => doTrain('spd'), cls: 'gold-btn' },
+    { label: '耐力訓練', sub: '體力 -22', fn: () => doTrain('sta'), cls: 'gold-btn' },
+    { label: '力量訓練', sub: '體力 -22', fn: () => doTrain('pow'), cls: 'gold-btn' },
+    { label: '根性訓練', sub: '體力 -22', fn: () => doTrain('gut'), cls: 'gold-btn' },
+    { label: '智慧訓練', sub: '體力 -22', fn: () => doTrain('wis'), cls: 'gold-btn' },
     { label: '休息', sub: '體力 +35（上限 100）', fn: doRest, cls: 'green-btn' },
     { label: '散步', sub: '心情 +1・體力 +12', fn: doWalk, cls: 'green-btn' },
     { label: '特級飼料', sub: '800 金・體力 +25', fn: doFeed, cls: 'ink-btn' },
@@ -984,7 +1136,23 @@ function renderBetPanel() {
       + (odds ? '<p class="text-xs text-[#5c5346] mt-2">目前賠率：獨贏 <b>' + odds.win + '</b>・位置 <b>' + odds.place + '</b>（依主力馬與對手實力估算，每次看略有浮動）</p>' : '')
       + '<button type="button" id="btn-bet" class="gold-btn text-sm px-4 py-2.5 mt-2 w-full">下注</button>';
   }
+  if (!specField) specField = genSpectateField(RACES[0]);
+  html += '<h2 class="font-black text-base mt-4">👀 觀賽下注 <span class="text-xs font-bold text-[#5c5346]">不參賽也能押，佔用當週行動</span></h2>'
+    + '<div class="grid grid-cols-2 gap-2 mt-2">'
+    + '<select id="spec-race" class="card p-2 text-sm font-bold w-full">' + RACES.map(r => '<option value="' + r.id + '"' + (r.id === specField.raceId ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>'
+    + '<select id="spec-horse" class="card p-2 text-sm font-bold w-full">' + specField.runners.map((r, i) => '<option value="' + i + '">[' + r.winOdds + '] ' + esc(r.name) + '</option>').join('') + '</select>'
+    + '</div>'
+    + '<div class="grid grid-cols-2 gap-2 mt-2">'
+    + '<select id="spec-type" class="card p-2 text-sm font-bold w-full"><option value="win">獨贏（冠軍）</option><option value="place">位置（前三）</option></select>'
+    + '<select id="spec-amount" class="card p-2 text-sm font-bold w-full">' + BET_AMOUNTS.map(a => '<option value="' + a + '">' + fmt(a) + ' 金</option>').join('') + '</select>'
+    + '</div>'
+    + '<p class="text-xs text-[#5c5346] mt-2">賠率寫在馬名前面；獨贏要押的馬拿冠軍，位置前三名就中。下注觀賽會用掉當週行動。</p>'
+    + '<button type="button" id="btn-spec-bet" class="gold-btn text-sm px-4 py-2.5 mt-2 w-full">下注並觀賽</button>';
   panel.innerHTML = html;
+  const sb = $('btn-spec-bet');
+  if (sb) sb.addEventListener('click', placeSpectateBet);
+  const sr = $('spec-race');
+  if (sr) sr.addEventListener('change', () => { specField = genSpectateField(RACES.find(r => r.id === sr.value)); renderBetPanel(); });
   const bb = $('btn-bet');
   if (bb) bb.addEventListener('click', () => setBet($('bet-race').value, $('bet-type').value, Number($('bet-amount').value)));
   const cb = $('btn-cancel-bet');
@@ -1055,6 +1223,7 @@ function renderAll() {
   renderHall();
 }
 function switchView(view) {
+  sfx('tap');
   currentView = view;
   ['stable', 'train', 'race', 'shop', 'hall'].forEach(v => {
     $('view-' + v).classList.toggle('hidden', v !== view);
@@ -1073,6 +1242,8 @@ function init() {
     btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
   });
   $('btn-refresh-shop').addEventListener('click', refreshShop);
+  setMuted(isMuted());
+  $('btn-mute').addEventListener('click', () => { setMuted(!isMuted()); if (!isMuted()) sfx('tap'); });
   renderAll();
 }
 window.addEventListener('load', init);
