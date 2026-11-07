@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -470,7 +470,8 @@ mockRandom(0.1);
 const r10 = T.drawGacha(10);
 t('T30 十連出10個', r10 && r10.length === 10, r10 && r10.length);
 t('T30 十連必有高稀有', r10.some(r => r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend')));
-t('T30 十連扣錢後有找', T.state.money > 910000, T.state.money);
+t('T30 十連放生金很少', T.state.money === 915000, T.state.money);
+t('T30 十連抽是花錢不是賺錢', T.state.money < 1000000, T.state.money);
 t('T30 馬房不超過6匹', T.state.horses.length === 6, T.state.horses.length);
 unmock();
 
@@ -482,7 +483,8 @@ mockRandom(0.1);
 const mBefore = T.state.money;
 const rF = T.drawGacha(10);
 t('T31 滿房馬不增加', T.state.horses.length === 6, T.state.horses.length);
-t('T31 滿房抽到的馬全賣掉換金', rF.every(r => r.kind !== 'horse' || r.kept === false) && T.state.money > mBefore - 90000, T.state.money);
+t('T31 滿房抽到的馬全放生換小錢', rF.every(r => r.kind !== 'horse' || r.kept === false) && T.state.money === 929000, T.state.money);
+t('T31 滿房十連也是花錢', T.state.money < mBefore, T.state.money);
 unmock();
 
 // --- T32 打工賺錢 ---
@@ -512,6 +514,78 @@ t('T33 金夠不補助', T.state.money === 10000, T.state.money);
 T.state.money = 0; T.state.week = 1;
 T.advanceWeek();
 t('T33 歸零也補助', T.state.money === 5000, T.state.money);
+
+// --- T34 神話階級 ---
+T.state = T.createDefaultState();
+const my = T.newHorse({ rarity: 'mythic' });
+t('T34 神話上限110', T.RARITY.mythic.cap === 110, T.RARITY.mythic.cap);
+t('T34 神話價600000起', T.horsePrice(my) >= 600000, T.horsePrice(my));
+t('T34 神話初始五圍70-90', Object.values(my.stats).every(v => v >= 70 && v <= 90), JSON.stringify(my.stats));
+t('T34 神話盃存在', T.RACES.some(r => r.id === 'mythic' && r.prize === 3000000 && r.oppBase === 112 && r.minWins === 8 && r.minAge === 4));
+T.state = T.createDefaultState();
+T.state.money = 1000000;
+const sireL = T.newHorse({ rarity: 'legend' }); sireL.sex = '公';
+const damL = T.newHorse({ rarity: 'legend' }); damL.sex = '母';
+T.state.horses = [sireL, damL];
+mockRandom(0.1);
+T.breed(sireL.id, damL.id);
+const foalM = T.state.horses[2];
+t('T34 傳奇配種可生神話', foalM && foalM.rarity === 'mythic', foalM && foalM.rarity);
+unmock();
+
+// --- T35 一鍵參賽 ---
+T.state = T.createDefaultState();
+T.state.money = 500000;
+const strong35 = T.newHorse({ rarity: 'legend' });
+strong35.stats = { spd: 90, sta: 90, pow: 90, gut: 90, wis: 90 };
+strong35.turf = '草'; strong35.dist = '長'; strong35.age = 3; strong35.wins = 5; strong35.energy = 100; strong35.mood = 2;
+strong35.persona = { name: '測試', desc: '', weak: 'tired', weakLabel: '', rival: '' };
+const weak35 = T.newHorse({ rarity: 'common' });
+weak35.stats = { spd: 30, sta: 30, pow: 30, gut: 30, wis: 30 };
+weak35.turf = '草'; weak35.dist = '短'; weak35.age = 2; weak35.wins = 0; weak35.energy = 100; weak35.mood = 2;
+weak35.persona = { name: '測試', desc: '', weak: 'tired', weakLabel: '', rival: '' };
+const tired35 = T.newHorse({ rarity: 'good' });
+tired35.energy = 10; tired35.wins = 0; tired35.age = 2;
+T.state.horses = [strong35, weak35, tired35];
+T.state.activeHorseId = strong35.id;
+mockRandom(0.5);
+const auto = T.autoRaceAll();
+t('T35 一鍵參賽只跑適合的', auto && auto.results.length === 1, auto && auto.results.length);
+t('T35 強馬自動打G1', auto.results[0].race === 'G1・天駒大賞', auto.results[0].race);
+t('T35 強馬冠軍獎金120萬', auto.results[0].rank === 1 && auto.results[0].prize === 1200000, auto.results[0].rank + '/' + auto.results[0].prize);
+t('T35 兩匹被跳過', auto.skipped.length === 2, auto.skipped.length);
+t('T35 跑完體力-25', strong35.energy === 75, strong35.energy);
+t('T35 跑完勝場+1', strong35.wins === 6, strong35.wins);
+t('T35 獎金有進帳', T.state.money > 500000, T.state.money);
+unmock();
+
+// --- T36 神話盃自動配對 ---
+T.state = T.createDefaultState();
+T.state.money = 500000;
+const mythicH = T.newHorse({ rarity: 'mythic' });
+mythicH.stats = { spd: 100, sta: 100, pow: 100, gut: 100, wis: 100 };
+mythicH.turf = '草'; mythicH.dist = '長'; mythicH.age = 4; mythicH.wins = 8; mythicH.energy = 100; mythicH.mood = 2;
+mythicH.persona = { name: '測試', desc: '', weak: 'tired', weakLabel: '', rival: '' };
+T.state.horses = [mythicH];
+T.state.activeHorseId = mythicH.id;
+mockRandom(0.5);
+const auto2 = T.autoRaceAll();
+t('T36 神話馬自動打神話盃', auto2 && auto2.results.length === 1 && auto2.results[0].race === '神話盃・天駒神話', auto2 && auto2.results[0] && auto2.results[0].race);
+t('T36 神話盃冠軍獎金300萬', auto2.results[0].rank === 1 && auto2.results[0].prize === 3000000, auto2.results[0].rank + '/' + auto2.results[0].prize);
+t('T36 神話盃勝場有記', mythicH.mythicwins === 1, mythicH.mythicwins);
+unmock();
+
+// --- T37 抽卡不能印鈔 ---
+T.state = T.createDefaultState();
+T.state.money = 1000000;
+while (T.state.horses.length < 6) T.state.horses.push(T.newHorse({ rarity: 'common' }));
+mockRandom(0.1);
+const before37 = T.state.money;
+T.drawGacha(10);
+t('T37 滿房十連抽完錢變少', T.state.money < before37, T.state.money);
+T.drawGacha(10);
+t('T37 連抽兩次錢更少', T.state.money < before37 - 90000, T.state.money);
+unmock();
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

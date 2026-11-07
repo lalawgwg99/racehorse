@@ -94,6 +94,9 @@
     <section id="view-race" class="space-y-3 hidden">
       <div class="card p-4">
         <h2 class="font-black text-base">🏆 比賽 <span class="text-xs font-bold text-[#5c5346]">報名佔用當週行動</span></h2>
+        <button type="button" id="btn-auto-race" class="gold-btn text-sm px-4 py-2.5 mt-2 w-full">⚡ 一鍵參賽：自動配對適合的馬</button>
+        <p class="text-[11px] text-[#5c5346] mt-1">每匹現役馬自動挑它打得贏的最高級別一起跑（不下注），全部只佔一週行動；體力不足或實力未到的會跳過。</p>
+        <div id="auto-race-results" class="mt-2"></div>
         <div id="race-list" class="space-y-2 mt-2"></div>
       </div>
       <div id="jockey-panel" class="card p-4"></div>
@@ -158,6 +161,7 @@ const RARITY = {
   good:   { label: '良血', cap: 80, color: '#1d6b41', priceBase: 40000 },
   noble:  { label: '名門', cap: 90, color: '#1d4ed8', priceBase: 100000 },
   legend: { label: '傳奇', cap: 99, color: '#d9941a', priceBase: 250000 },
+  mythic: { label: '神話', cap: 110, color: '#8b5cf6', priceBase: 600000 },
 };
 const RACES = [
   { id: 'maiden', name: '新馬戰', tier: '新馬', minWins: 0, minAge: 2, prize: 30000, dist: 1200, distType: '短', turf: '草', oppBase: 42 },
@@ -166,6 +170,7 @@ const RACES = [
   { id: 'g3',     name: 'G3・青葉賞', tier: 'G3', minWins: 3, minAge: 3, prize: 300000, dist: 2000, distType: '中', turf: '草', oppBase: 82 },
   { id: 'g2',     name: 'G2・天駒盃', tier: 'G2', minWins: 4, minAge: 3, prize: 600000, dist: 2200, distType: '長', turf: '草', oppBase: 90 },
   { id: 'g1',     name: 'G1・天駒大賞', tier: 'G1', minWins: 5, minAge: 3, prize: 1200000, dist: 2400, distType: '長', turf: '草', oppBase: 98 },
+  { id: 'mythic', name: '神話盃・天駒神話', tier: '神話', minWins: 8, minAge: 4, prize: 3000000, dist: 2600, distType: '長', turf: '草', oppBase: 112 },
 ];
 const NAME_A = ['烈風', '追風', '雷霆', '疾風', '星月', '雪影', '烈焰', '龍騰', '虎嘯', '金駒', '銀蹄', '赤兔', '玄風', '青雲', '白駒', '紫電', '金光', '飛燕', '破曉', '晨光', '夜鷹', '海浪', '山嵐', '火鳳', '冰霜', '狂風', '閃電', '流星', '彩虹', '黑豹'];
 const NAME_B = ['號', '之星', '王者', '傳奇', '疾風', '飛馳', '旋風', '雄心', '戰士', '小子', '公主', '王子'];
@@ -258,16 +263,18 @@ function genHorseName(existing) {
 }
 function rollRarity() {
   const r = Math.random();
-  if (r < 0.45) return 'common';
-  if (r < 0.75) return 'good';
-  if (r < 0.93) return 'noble';
-  return 'legend';
+  if (r < 0.43) return 'common';
+  if (r < 0.73) return 'good';
+  if (r < 0.91) return 'noble';
+  if (r < 0.98) return 'legend';
+  return 'mythic';
 }
 function rarityStatRange(rarity) {
   if (rarity === 'common') return [25, 45];
   if (rarity === 'good') return [35, 55];
   if (rarity === 'noble') return [45, 65];
-  return [55, 75];
+  if (rarity === 'legend') return [55, 75];
+  return [70, 90];
 }
 const PERSONAS = [
   { name: '萬年老三', desc: '總是差一點點就贏', weak: 'big', weakLabel: '大賽緊張（G1/G2 -6）' },
@@ -323,6 +330,7 @@ function newHorse(opts) {
     g1wins: 0,
     g2wins: 0,
     g3wins: 0,
+    mythicwins: 0,
     retired: false,
     equipment: {},
   };
@@ -414,7 +422,7 @@ function migrateState() {
   if (!state.redeemedCodes) state.redeemedCodes = [];
   (state.jockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   (state.shopJockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
-  state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); });
+  state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); if (h.mythicwins === undefined) h.mythicwins = 0; });
 }
 function createDefaultState() {
   const starter = newHorse({ rarity: 'good' });
@@ -766,7 +774,7 @@ function runRace(raceId) {
   const outcome = calcRaceOutcome(h, race);
   startRaceAnimation(race, outcome, () => { finishRace(h, race, outcome); racing = false; });
 }
-function finishRace(h, race, outcome) {
+function applyRaceResult(h, race, outcome) {
   const rank = outcome.myRank;
   let prize = 0;
   if (rank === 1) prize = race.prize;
@@ -780,6 +788,7 @@ function finishRace(h, race, outcome) {
     if (race.tier === 'G1') h.g1wins += 1;
     if (race.tier === 'G2') h.g2wins += 1;
     if (race.tier === 'G3') h.g3wins += 1;
+    if (race.tier === '神話') h.mythicwins = (h.mythicwins || 0) + 1;
     h.mood = clamp(h.mood + 1, 0, 4);
   } else {
     h.mood = clamp(h.mood - 1, 0, 4);
@@ -796,11 +805,17 @@ function finishRace(h, race, outcome) {
     if (beforeBond < 80 && jock2.bond >= 80) addLog('💛 騎師' + jock2.name + '羈絆滿 80！進入彩圈狀態，加成翻倍！');
   }
   if (rank === 1 && Math.random() < 0.35) {
-    const dropTier = race.tier === 'G1' ? (Math.random() < 0.3 ? 'legend' : 'master') : (race.tier === 'G2' ? (Math.random() < 0.3 ? 'master' : 'fine') : undefined);
+    const dropTier = race.tier === '神話' ? (Math.random() < 0.5 ? 'legend' : 'master') : (race.tier === 'G1' ? (Math.random() < 0.3 ? 'legend' : 'master') : (race.tier === 'G2' ? (Math.random() < 0.3 ? 'master' : 'fine') : undefined));
     const drop = genEquipment(undefined, dropTier);
     state.equipment.push(drop);
     addLog('🎁 ' + h.name + '奪冠獲得裝備「' + drop.name + '」！');
   }
+  addLog('🏆 ' + h.name + '出戰' + race.name + '，第 ' + rank + ' 名' + (prize > 0 ? '，獎金 +' + fmt(prize) : '，無獎金') + '。');
+  return { rank: rank, prize: prize };
+}
+
+function finishRace(h, race, outcome) {
+  const rank = outcome.myRank;
   if (state.pendingBet && state.pendingBet.raceId === race.id) {
     const b = state.pendingBet;
     let winAmt = 0;
@@ -814,7 +829,8 @@ function finishRace(h, race, outcome) {
     }
     state.pendingBet = null;
   }
-  addLog('🏆 ' + h.name + '出戰' + race.name + '，第 ' + rank + ' 名' + (prize > 0 ? '，獎金 +' + fmt(prize) : '，無獎金') + '。');
+  const res = applyRaceResult(h, race, outcome);
+  const prize = res.prize;
   const live = $('race-live');
   const winner = outcome.runners[0];
   const me = outcome.runners.find(r => r.isPlayer);
@@ -835,6 +851,40 @@ function finishRace(h, race, outcome) {
   sfx(rank === 1 ? 'win' : 'lose');
   if (prize > 0) sfx('coin');
   afterAction();
+}
+
+let lastAutoRaceResults = null;
+function autoRaceAll() {
+  const results = [];
+  const skipped = [];
+  const jock = activeJockey();
+  const fee = jock ? JOCKEY_GRADES[jock.grade].raceFee : 0;
+  for (const h of state.horses) {
+    if (h.retired) continue;
+    let best = null;
+    for (let i = RACES.length - 1; i >= 0; i--) {
+      const race = RACES[i];
+      if (raceEligible(h, race)) continue;
+      if (calcPower(h, race) < race.oppBase - 3) continue;
+      best = race; break;
+    }
+    if (!best) { skipped.push({ name: h.name, reason: h.energy < 25 ? '體力不足 25' : '實力未達任何級別' }); continue; }
+    if (jock && state.money < fee) { skipped.push({ name: h.name, reason: '金不夠付騎師出賽費' }); continue; }
+    h.energy = clamp(h.energy - 25, 0, 100);
+    if (jock) state.money -= fee;
+    const outcome = calcRaceOutcome(h, best);
+    const res = applyRaceResult(h, best, outcome);
+    results.push({ name: h.name, race: best.name, rank: res.rank, prize: res.prize });
+  }
+  lastAutoRaceResults = { results: results, skipped: skipped };
+  if (!results.length) { showToast('沒有適合參賽的馬，先練一練或回體力'); renderAll(); return null; }
+  const total = results.reduce((a, r) => a + r.prize, 0);
+  const wins = results.filter(r => r.rank === 1).length;
+  addLog('⚡ 一鍵參賽：' + results.length + ' 匹出賽、' + wins + ' 勝，獎金共 +' + fmt(total));
+  showToast('一鍵參賽完成，獎金 +' + fmt(total) + '！');
+  sfx(wins > 0 ? 'win' : 'coin');
+  afterAction();
+  return lastAutoRaceResults;
 }
 
 /* ================= 商店 / 馬房操作 ================= */
@@ -951,17 +1001,18 @@ function breed(sireId, damId) {
   state.money -= BREED_COST;
   const foal = newHorse();
   foal.age = 2;
-  STAT_KEYS.forEach(k => { foal.stats[k] = clamp(Math.round((sire.stats[k] + dam.stats[k]) / 2) + randInt(-3, 5), 10, 99); });
+  const order = ['common', 'good', 'noble', 'legend', 'mythic'];
+  let rIdx = Math.max(order.indexOf(sire.rarity), order.indexOf(dam.rarity));
+  if (Math.random() < 0.2 && rIdx < 4) rIdx += 1;
+  foal.rarity = order[rIdx];
+  const foalCap = statCap(foal);
+  STAT_KEYS.forEach(k => { foal.stats[k] = clamp(Math.round((sire.stats[k] + dam.stats[k]) / 2) + randInt(-3, 5), 10, foalCap); });
   let mutated = '';
   if (Math.random() < 0.15) {
     const k = randPick(STAT_KEYS);
-    foal.stats[k] = clamp(foal.stats[k] + 5, 10, 99);
+    foal.stats[k] = clamp(foal.stats[k] + 5, 10, foalCap);
     mutated = '（突變！' + STAT_LABEL[k] + ' +5）';
   }
-  const order = ['common', 'good', 'noble', 'legend'];
-  let rIdx = Math.max(order.indexOf(sire.rarity), order.indexOf(dam.rarity));
-  if (Math.random() < 0.2 && rIdx < 3) rIdx += 1;
-  foal.rarity = order[rIdx];
   foal.turf = Math.random() < 0.5 ? sire.turf : dam.turf;
   foal.dist = Math.random() < 0.5 ? sire.dist : dam.dist;
   state.horses.push(foal);
@@ -1301,6 +1352,12 @@ function renderBetPanel() {
 function renderRace() {
   renderJockeyPanel();
   renderBetPanel();
+  $('btn-auto-race').addEventListener('click', autoRaceAll);
+  const ar = $('auto-race-results');
+  if (lastAutoRaceResults) {
+    ar.innerHTML = '<div class="space-y-1">' + lastAutoRaceResults.results.map(r => '<div class="flex items-center justify-between text-xs p-2 rounded-lg bg-white border border-[#e6dcc5]"><span>🐴 ' + esc(r.name) + '・' + esc(r.race) + '</span><span class="font-black">' + (r.rank === 1 ? '🥇 冠軍' : '第 ' + r.rank + ' 名') + '・獎金 +' + fmt(r.prize) + '</span></div>').join('')
+      + lastAutoRaceResults.skipped.map(s2 => '<div class="text-[11px] text-[#9a8f7a]">⏭️ ' + esc(s2.name) + '：' + esc(s2.reason) + '</div>').join('') + '</div>';
+  } else { ar.innerHTML = ''; }
   const h = activeHorse();
   $('race-list').innerHTML = RACES.map(race => {
     const err = raceEligible(h, race);
@@ -1348,9 +1405,10 @@ function renderRedeemPanel() {
 
 /* ================= 抽卡 ================= */
 const GACHA_SINGLE = 10000, GACHA_TEN = 90000;
+const GACHA_RELEASE = { common: 1000, good: 2000, noble: 5000, legend: 10000, mythic: 20000 };
 let lastGachaResults = null;
 function gachaHigh(item) {
-  if (item.kind === 'horse') return item.horse.rarity === 'noble' || item.horse.rarity === 'legend';
+  if (item.kind === 'horse') return item.horse.rarity === 'noble' || item.horse.rarity === 'legend' || item.horse.rarity === 'mythic';
   if (item.kind === 'equip') return item.equip.tier === 'master' || item.equip.tier === 'legend';
   return item.jockey.grade === 'elite' || item.jockey.grade === 'ace';
 }
@@ -1359,8 +1417,9 @@ function genGachaItem(forceHigh) {
   const kind = r < 0.5 ? 'horse' : (r < 0.8 ? 'equip' : 'jockey');
   if (kind === 'horse') {
     let h = genShopHorse();
-    if (forceHigh && h.rarity !== 'noble' && h.rarity !== 'legend') {
-      h = newHorse({ rarity: Math.random() < 0.3 ? 'legend' : 'noble' });
+    if (forceHigh && h.rarity !== 'noble' && h.rarity !== 'legend' && h.rarity !== 'mythic') {
+      const fr = Math.random();
+      h = newHorse({ rarity: fr < 0.1 ? 'mythic' : (fr < 0.4 ? 'legend' : 'noble') });
       h.price = horsePrice(h);
     }
     return { kind: 'horse', horse: h };
@@ -1383,7 +1442,7 @@ function drawGacha(count) {
   for (let i = 0; i < count; i++) {
     items.push(genGachaItem((state.gachaPity || 0) + i >= 9));
   }
-  const horseRank = { common: 0, good: 1, noble: 2, legend: 3 };
+  const horseRank = { common: 0, good: 1, noble: 2, legend: 3, mythic: 4 };
   const statSum = h => STAT_KEYS.reduce((a, k) => a + h.stats[k], 0);
   const drawnHorses = items.filter(it => it.kind === 'horse');
   drawnHorses.sort((a, b) => (horseRank[b.horse.rarity] - horseRank[a.horse.rarity]) || (statSum(b.horse) - statSum(a.horse)));
@@ -1400,7 +1459,7 @@ function drawGacha(count) {
         state.horses.push(kept);
         results.push({ kind: 'horse', name: kept.name, rarity: kept.rarity, kept: true });
       } else {
-        const val = Math.round(horsePrice(it.horse) * 0.5);
+        const val = GACHA_RELEASE[it.horse.rarity] || 1000;
         state.money += val;
         results.push({ kind: 'horse', name: it.horse.name, rarity: it.horse.rarity, kept: false, soldFor: val });
       }
@@ -1414,7 +1473,7 @@ function drawGacha(count) {
   });
   state.gachaPity = pity;
   lastGachaResults = results;
-  const isHighRes = r => (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
+  const isHighRes = r => (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend' || r.rarity === 'mythic')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
   const highs = results.filter(isHighRes);
   addLog('🎰 抽卡' + (isTen ? '十連' : '單抽') + '：' + (highs.length ? '中了 ' + highs.map(x => x.name).join('、') + '！' : '沒有高稀有，下次保底見。'));
   showToast(highs.length ? '中了 ' + highs[0].name + '！' : (isTen ? '十連抽完成' : '單抽完成'));
@@ -1427,16 +1486,16 @@ function renderGachaPanel() {
   const panel = $('gacha-panel');
   const pityLeft = 10 - (state.gachaPity || 0);
   let html = '<h2 class="font-black text-base">🎰 抽卡 <span class="text-xs font-bold text-[#5c5346]">馬 50%・裝備 30%・騎師 20%</span></h2>'
-    + '<p class="text-xs text-[#5c5346] mt-1">馬：普通 45%／良血 30%／名門 18%／傳奇 7%；裝備：粗製 55%／精良 25%／名匠 15%／傳奇 5%；騎師：見習 50%／普通 30%／精英 15%／王牌 5%。高稀有（名門馬／名匠裝備／精英騎師以上）每 10 抽必出 1 個，現在保底還差 <b>' + pityLeft + '</b> 抽。馬房滿了時多抽到的馬會自動出售換金（市價五成）。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-1">馬：普通 43%／良血 30%／名門 18%／傳奇 7%／神話 2%；裝備：粗製 55%／精良 25%／名匠 15%／傳奇 5%；騎師：見習 50%／普通 30%／精英 15%／王牌 5%。高稀有（名門馬／神話馬／名匠裝備／精英騎師以上）每 10 抽必出 1 個，現在保底還差 <b>' + pityLeft + '</b> 抽。馬房滿了時多抽到的馬會自動放生，領一筆小額放生金（普通 1,000／良血 2,000／名門 5,000／傳奇 10,000／神話 20,000）。</p>'
     + '<div class="grid grid-cols-2 gap-2 mt-2">'
     + '<button type="button" id="btn-gacha-1" class="gold-btn text-sm px-4 py-2.5">單抽' + (state.gachaFreeUsed ? '・10,000 金' : '・首次免費') + '</button>'
     + '<button type="button" id="btn-gacha-10" class="gold-btn text-sm px-4 py-2.5">十連抽・90,000 金</button>'
     + '</div>';
   if (lastGachaResults) {
     html += '<div class="mt-3 space-y-1.5">' + lastGachaResults.map(r => {
-      const high = (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
+      const high = (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend' || r.rarity === 'mythic')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
       const label = r.kind === 'horse' ? '🐴 ' + esc(r.name) + '（' + RARITY[r.rarity].label + '馬）' : (r.kind === 'equip' ? '🎒 ' + esc(r.name) : '🧢 ' + esc(r.name));
-      return '<div class="flex items-center justify-between text-xs p-2 rounded-lg ' + (high ? 'bg-[#fff8e6] border border-[#d9941a] font-black' : 'bg-white border border-[#e6dcc5]') + '"><span>' + label + '</span><span>' + (r.kept ? '✅ 已保留' : '💰 已售 +' + fmt(r.soldFor) + ' 金') + '</span></div>';
+      return '<div class="flex items-center justify-between text-xs p-2 rounded-lg ' + (high ? 'bg-[#fff8e6] border border-[#d9941a] font-black' : 'bg-white border border-[#e6dcc5]') + '"><span>' + label + '</span><span>' + (r.kept ? '✅ 已保留' : '🕊️ 放生 +' + fmt(r.soldFor) + ' 金') + '</span></div>';
     }).join('') + '</div>';
   }
   panel.innerHTML = html;
