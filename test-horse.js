@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -381,6 +381,53 @@ unmock();
 let sfxOk = true;
 try { T.sfx('tap'); T.sfx('win'); T.sfx('count'); T.sfx('go'); T.setMuted(true); T.setMuted(false); } catch (e) { sfxOk = false; }
 t('T21 音效呼叫不報錯', sfxOk);
+
+// --- T22 騎師羈絆彩圈 ---
+const jbLow = T.jockeyBonus({ grade: 'rookie', level: 1, bond: 0 });
+const jbHigh = T.jockeyBonus({ grade: 'rookie', level: 1, bond: 80 });
+t('T22 羈絆80加成翻倍', jbHigh.spd === jbLow.spd * 2, jbLow.spd + '->' + jbHigh.spd);
+t('T22 羈絆79不翻倍', T.jockeyBonus({ grade: 'rookie', level: 1, bond: 79 }).spd === jbLow.spd);
+
+// --- T23 血統點 ---
+T.state = T.createDefaultState();
+T.state.legacyPoints = 0;
+const old1 = T.state.horses[0];
+old1.age = 6; old1.wins = 6; old1.g1wins = 1; old1.retired = false;
+T.state.week = 52;
+T.advanceWeek();
+t('T23 引退給3血統點', T.state.legacyPoints === 3, T.state.legacyPoints);
+t('T23 馬已引退', old1.retired === true);
+const nh = T.newHorse({ rarity: 'good' });
+nh.stats.spd = 40; T.state.horses.push(nh); T.state.activeHorseId = nh.id;
+T.spendLegacy('spd');
+t('T23 血統點-1換速度+5', T.state.legacyPoints === 2 && nh.stats.spd === 45, T.state.legacyPoints + '/' + nh.stats.spd);
+
+// --- T24 人設弱點 ---
+const ph = T.newHorse({ rarity: 'good' });
+ph.stats = { spd: 50, sta: 50, pow: 50, gut: 50, wis: 50 };
+ph.turf = '草'; ph.dist = '短'; ph.mood = 2; ph.energy = 100; ph.equipment = {};
+ph.persona = '萬年老三';
+t('T24 大賽弱點G1扣6', T.weakPenalty(ph, T.RACES[5]) === 6);
+t('T24 大賽弱點新馬戰不扣', T.weakPenalty(ph, T.RACES[0]) === 0);
+ph.persona = null;
+const pNoWeak = T.calcPower(ph, T.RACES[5]);
+ph.persona = '萬年老三';
+const pWeak = T.calcPower(ph, T.RACES[5]);
+t('T24 戰力差正好6', Math.abs((pNoWeak - pWeak) - 6) < 0.001, pNoWeak + ' vs ' + pWeak);
+
+// --- T25 失敗原因 ---
+const tip1 = T.lossTip({ mood: 1, stats: { spd: 50, sta: 50, pow: 50, gut: 50, wis: 50 } }, T.RACES[0], 8);
+t('T25 心情差先講心情', tip1.indexOf('心情') >= 0, tip1);
+const tip2 = T.lossTip({ mood: 4, stats: { spd: 30, sta: 60, pow: 50, gut: 50, wis: 50 } }, T.RACES[0], 8);
+t('T25 短距離點名速度', tip2.indexOf('速度') >= 0, tip2);
+
+// --- T26 實況文案＋跳過 ---
+t('T26 開場實況', T.raceCommentAt(0, 'A').indexOf('閘門') >= 0);
+t('T26 中段實況', T.raceCommentAt(0.4, 'A').indexOf('中段') >= 0);
+t('T26 最後直線藏名次', T.raceCommentAt(0.8, 'A').indexOf('藏起來') >= 0);
+let skipOk = true;
+try { T.skipRace(); } catch (e) { skipOk = false; }
+t('T26 沒比賽時跳過不報錯', skipOk);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
