@@ -779,8 +779,9 @@ function previewOdds(race) {
   const h = activeHorse();
   if (!h) return null;
   const myPow = calcPower(h, race);
+  const spread = [-8, -5, -2, 0, 2, 5, 8];
   let sum = myPow;
-  for (let i = 0; i < 7; i++) sum += race.oppBase + randInt(-8, 8);
+  for (let i = 0; i < 7; i++) sum += race.oppBase + spread[i];
   const winProb = myPow / sum;
   const winOdds = clamp(Math.round((1 / winProb) * 10) / 10, 1.2, 12);
   const placeOdds = Math.max(1.1, Math.round(winOdds * 0.35 * 10) / 10);
