@@ -189,15 +189,16 @@ t('T9 賣馬-1', T.state.horses.length === 5);
 // --- T10 老化與引退 ---
 T.state = T.createDefaultState();
 h = T.state.horses[0];
-h.age = 6; h.stats.spd = 50; T.state.week = 52;
+h.age = 9; h.stats.spd = 50; T.state.week = 52;
 T.advanceWeek();
 t('T10 跨年 year+1 week=1', T.state.year === 2 && T.state.week === 1);
-t('T10 7歲引退', h.retired === true, 'age=' + h.age + ' retired=' + h.retired);
+t('T10 10歲引退', h.retired === true, 'age=' + h.age + ' retired=' + h.retired);
 T.state = T.createDefaultState();
 h = T.state.horses[0];
-h.age = 4; h.stats.spd = 50; T.state.week = 52;
+h.age = 6; h.stats.spd = 50; T.state.week = 52;
 T.advanceWeek();
-t('T10 5歲全屬性-3', h.stats.spd === 47, h.stats.spd);
+t('T10 7歲全屬性-3', h.stats.spd === 47, h.stats.spd);
+t('T10 7歲還沒引退', h.retired === false);
 
 // --- T11 存檔往返 ---
 T.state = T.createDefaultState();
@@ -392,7 +393,7 @@ t('T22 羈絆79不翻倍', T.jockeyBonus({ grade: 'rookie', level: 1, bond: 79 }
 T.state = T.createDefaultState();
 T.state.legacyPoints = 0;
 const old1 = T.state.horses[0];
-old1.age = 6; old1.wins = 6; old1.g1wins = 1; old1.retired = false;
+old1.age = 9; old1.wins = 6; old1.g1wins = 1; old1.retired = false;
 T.state.week = 52;
 T.advanceWeek();
 t('T23 引退給3血統點', T.state.legacyPoints === 3, T.state.legacyPoints);
@@ -428,6 +429,17 @@ t('T26 最後直線藏名次', T.raceCommentAt(0.8, 'A').indexOf('藏起來') >=
 let skipOk = true;
 try { T.skipRace(); } catch (e) { skipOk = false; }
 t('T26 沒比賽時跳過不報錯', skipOk);
+
+// --- T27 引退馬可以配種 ---
+T.state = T.createDefaultState();
+T.state.money = 100000;
+const sire27 = T.state.horses[0];
+sire27.sex = '公'; sire27.retired = true; sire27.age = 10;
+const dam27 = T.newHorse({ rarity: 'good' });
+dam27.sex = '母'; dam27.age = 3; T.state.horses.push(dam27);
+const nBefore = T.state.horses.length;
+T.breed(sire27.id, dam27.id);
+t('T27 引退公馬能配種', T.state.horses.length === nBefore + 1, T.state.horses.length);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

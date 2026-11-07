@@ -568,13 +568,13 @@ function advanceWeek() {
     state.horses.forEach(h => {
       if (h.retired) return;
       h.age += 1;
-      if (h.age >= 5) {
+      if (h.age >= 7) {
         STAT_KEYS.forEach(k => { h.stats[k] = clamp(h.stats[k] - 3, 10, 99); });
         addLog('🍂 ' + h.name + ' ' + h.age + ' 歲了，巔峰已過，全屬性 -3');
       }
-      if (h.age >= 7) {
+      if (h.age >= 10) {
         h.retired = true;
-        addLog('👋 ' + h.name + ' 7 歲引退了，感謝牠的付出！可以在馬房賣出或留作紀念。');
+        addLog('👋 ' + h.name + ' 10 歲引退了，感謝牠的付出！可以在馬房賣出、留作紀念，或繼續配種。');
         const lp = 1 + (h.wins >= 5 ? 1 : 0) + (h.g1wins > 0 ? 1 : 0);
         state.legacyPoints = (state.legacyPoints || 0) + lp;
         addLog('🧬 ' + h.name + '留下 ' + lp + ' 個血統點（勝場 ' + h.wins + '、G1 ' + h.g1wins + ' 次），可在馬房傳承給現役馬！');
@@ -924,7 +924,6 @@ function breed(sireId, damId) {
   const dam = state.horses.find(h => h.id === damId);
   if (!sire || !dam) { showToast('請選一匹公馬和一匹母馬'); return; }
   if (sire.sex !== '公' || dam.sex !== '母') { showToast('配種需要一匹公馬＋一匹母馬'); return; }
-  if (sire.retired || dam.retired) { showToast('引退馬不能配種'); return; }
   if (sireId === damId) { showToast('不能自己跟自己配'); return; }
   if (state.money < BREED_COST) { showToast('配種費要 ' + fmt(BREED_COST) + ' 金'); return; }
   if (state.horses.length >= MAX_STABLE) { showToast('馬房滿了（最多 ' + MAX_STABLE + ' 匹）'); return; }
@@ -1121,9 +1120,9 @@ function renderStable() {
     + statBar('速度', h.stats.spd, '#d9941a') + statBar('耐力', h.stats.sta, '#1d6b41')
     + statBar('力量', h.stats.pow, '#9e2a22') + statBar('根性', h.stats.gut, '#1d4ed8')
     + statBar('智慧', h.stats.wis, '#7c3aed') + '</div>'
-    + '<p class="text-[11px] text-[#5c5346] mt-2">' + RARITY[h.rarity].label + '馬成長上限 ' + cap + '。' + (h.retired ? '已引退，不能再訓練或比賽。' : (h.age >= 5 ? '已過巔峰期，每年全屬性 -3。' : '巔峰期在 3～4 歲，把握黃金時間。')) + '</p>'
+    + '<p class="text-[11px] text-[#5c5346] mt-2">' + RARITY[h.rarity].label + '馬成長上限 ' + cap + '。' + (h.retired ? '已引退，不能再訓練或比賽，但可以配種。' : (h.age >= 7 ? '已過巔峰期，每年全屬性 -3。' : '巔峰期在 2～6 歲，把握黃金時間。')) + '</p>'
     + '<div class="mt-3 p-2.5 rounded-xl border border-[#e6dcc5] bg-[#fff8e6]"><div class="text-xs font-black">🧬 血統傳承　<span class="text-[#5c5346] font-bold">血統點 ' + (state.legacyPoints || 0) + '（馬匹引退時留下）</span></div>'
-    + ((state.legacyPoints || 0) > 0 ? '<div class="flex flex-wrap gap-1.5 mt-2">' + ['spd', 'sta', 'pow', 'gut', 'wis'].map(k => '<button type="button" data-legacy="' + k + '" class="paper-btn text-xs px-2 py-1">' + STAT_LABEL[k] + ' +5</button>').join('') + '</div>' : '<div class="text-[11px] text-[#9a8f7a] mt-1">還沒有血統點，讓一匹馬跑到 7 歲引退就能留下。</div>') + '</div>'
+    + ((state.legacyPoints || 0) > 0 ? '<div class="flex flex-wrap gap-1.5 mt-2">' + ['spd', 'sta', 'pow', 'gut', 'wis'].map(k => '<button type="button" data-legacy="' + k + '" class="paper-btn text-xs px-2 py-1">' + STAT_LABEL[k] + ' +5</button>').join('') + '</div>' : '<div class="text-[11px] text-[#9a8f7a] mt-1">還沒有血統點，讓一匹馬跑到 10 歲引退就能留下。</div>') + '</div>'
     + '<button type="button" id="btn-sell-horse" class="paper-btn text-xs px-3 py-2 mt-3">賣掉這匹馬</button>';
   $('btn-sell-horse').addEventListener('click', () => sellHorse(h.id));
   document.querySelectorAll('[data-legacy]').forEach(btn => {
@@ -1160,11 +1159,11 @@ function renderEquipPanel(h) {
 }
 function renderBreedPanel() {
   const panel = $('breed-panel');
-  const males = state.horses.filter(h => h.sex === '公' && !h.retired);
-  const females = state.horses.filter(h => h.sex === '母' && !h.retired);
+  const males = state.horses.filter(h => h.sex === '公');
+  const females = state.horses.filter(h => h.sex === '母');
   const canBreed = males.length && females.length && state.horses.length < MAX_STABLE;
   panel.innerHTML = '<h2 class="font-black text-base">🐴 繁殖配種 <span class="text-xs font-bold text-[#5c5346]">配種費 ' + fmt(BREED_COST) + ' 金</span></h2>'
-    + '<p class="text-xs text-[#5c5346] mt-1">子嗣五圍取父母平均 ± 浮動，15% 機率突變 +5，稀有度取較高者、20% 機率升一階。出生即 2 歲，可直接育成。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-1">子嗣五圍取父母平均 ± 浮動，15% 機率突變 +5，稀有度取較高者、20% 機率升一階。出生即 2 歲，可直接育成。引退馬也可以配種。</p>'
     + '<div class="grid grid-cols-2 gap-2 mt-2">'
     + '<select id="breed-sire" class="card p-2 text-sm font-bold w-full">' + males.map(m => '<option value="' + m.id + '">' + esc(m.name) + '（' + RARITY[m.rarity].label + '）</option>').join('') + '</select>'
     + '<select id="breed-dam" class="card p-2 text-sm font-bold w-full">' + females.map(m => '<option value="' + m.id + '">' + esc(m.name) + '（' + RARITY[m.rarity].label + '）</option>').join('') + '</select>'
