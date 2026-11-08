@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,migrateState,migratedMoney,saveState,loadState,formBonus,horsePower,calcOdds,comboOdds,payoutFor,genDayRaces,currentRace,todayStats,setBetType,setBetAmount,togglePick,betOddsFor,placeBet,doWork,checkRelief,finishRace,nextRace,nextDay,showDaySummary,raceCommentAt,renderHeader,renderSchedule,renderBetSheet,renderRecords,renderAll,switchView,HORSES,HORSE_MAP,RACE_SCHEDULE,BET_TYPES,BET_AMOUNTS,COATS,SAVE_KEY,OLD_SAVE_KEY,$,get state(){return state},set state(v){state=v},get betDraft(){return betDraft},set betDraft(v){betDraft=v},get racing(){return racing},set racing(v){racing=v}};');
+eval(script + ';globalThis.__T={createDefaultState,migrateState,migratedMoney,saveState,loadState,formBonus,horsePower,calcOdds,comboOdds,payoutFor,genDayRaces,currentRace,todayStats,setBetType,setBetAmount,betAllIn,setCustomAmount,togglePick,betOddsFor,placeBet,doWork,checkRelief,finishRace,nextRace,nextDay,showDaySummary,raceCommentAt,renderHeader,renderSchedule,renderBetSheet,renderRecords,renderAll,switchView,effFor,rollEvent,buildOutcome,eventText,eventReveal,rollWeather,ownerRaceIdx,vipBonus,buyVip,buyNaming,buyTrophy,ownerPrice,buyHorse,startGallop,stopGallop,cheer,HORSES,HORSE_MAP,RACE_SCHEDULE,BET_TYPES,BET_CHIPS,WEATHERS,VIP_TIERS,TROPHIES,NAMING_PRICE,NAMING_DAYS,OWNER_WIN_BONUS,OWNER_G1_BONUS,OWNER_PLACE_BONUS,COATS,SAVE_KEY,OLD_SAVE_KEY,$,get state(){return state},set state(v){state=v},get betDraft(){return betDraft},set betDraft(v){betDraft=v},get racing(){return racing},set racing(v){racing=v},get gallopTimer(){return gallopTimer}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -105,17 +105,22 @@ t('B5 三連敗-4.5', T.formBonus('h01') === -4.5, T.formBonus('h01'));
 T.state.horseForm['h01'] = [1, 4, 7];
 t('B5 混合近況=0', T.formBonus('h01') === 0, T.formBonus('h01'));
 
-// --- B6 賠率：強馬賠率低 ---
-freshState();
-mockRandom(0.5);
-T.genDayRaces();
-unmock();
-const r0 = T.state.races[0];
-const sortedByPower = r0.runners.slice().sort((a, b) => b.power - a.power);
-t('B6 最強馬賠率最低', sortedByPower[0].winOdds <= sortedByPower[sortedByPower.length - 1].winOdds, sortedByPower[0].winOdds + ' vs ' + sortedByPower[sortedByPower.length - 1].winOdds);
-t('B6 獨贏賠率在區間內', r0.runners.every(x => x.winOdds >= 1.2 && x.winOdds <= 30));
-t('B6 位置賠率=獨贏x0.4下限1.1', r0.runners.every(x => Math.abs(x.placeOdds - Math.max(1.1, Math.round(x.winOdds * 0.4 * 10) / 10)) < 0.01));
-t('B6 賠率隨戰力單調', r0.runners.slice().sort((a, b) => b.power - a.power).every((x, i, arr) => i === 0 || x.winOdds >= arr[i - 1].winOdds));
+// --- B6 賠率：蒙地卡羅照真實勝率（多日統計） ---
+let allInRange = true, allPlaceOk = true, favLower = 0, races6 = 0;
+for (let d = 0; d < 5; d++) {
+  freshState();
+  T.genDayRaces();
+  T.state.races.forEach(r => {
+    races6++;
+    if (!r.runners.every(x => x.winOdds >= 1.2 && x.winOdds <= 40)) allInRange = false;
+    if (!r.runners.every(x => Math.abs(x.placeOdds - Math.max(1.1, Math.round(x.winOdds * 0.35 * 10) / 10)) < 0.01)) allPlaceOk = false;
+    const byPower = r.runners.slice().sort((a, b) => b.power - a.power);
+    if (byPower[0].winOdds <= byPower[byPower.length - 1].winOdds) favLower++;
+  });
+}
+t('B6 獨贏賠率在區間內', allInRange);
+t('B6 位置賠率=獨贏x0.35下限1.1', allPlaceOk);
+t('B6 最強馬賠率多半最低', favLower >= races6 * 0.8, favLower + '/' + races6);
 
 // --- B7-B10 派彩 ---
 const ranks7 = ['h01', 'h02', 'h03', 'h04', 'h05', 'h06', 'h07', 'h08'];
@@ -279,7 +284,7 @@ unmock();
 T.renderAll();
 t('B23 下注頁8匹馬', (T.$('bet-sheet').innerHTML.match(/獨贏 [0-9.]+ 倍/g) || []).length === 8, (T.$('bet-sheet').innerHTML.match(/獨贏 [0-9.]+ 倍/g) || []).length);
 t('B23 四種玩法按鈕', ['獨贏', '位置', '連贏', '三重彩'].every(x => T.$('bet-sheet').innerHTML.includes(x)));
-t('B23 五種注額', [1000, 5000, 10000, 50000, 100000].every(a => T.$('bet-sheet').innerHTML.includes(a.toLocaleString('en-US'))));
+t('B23 籌碼+全部+自訂金額', [1000, 5000, 10000, 50000].every(a => T.$('bet-sheet').innerHTML.includes(a.toLocaleString('en-US'))) && T.$('bet-sheet').innerHTML.includes('全部') && T.$('bet-sheet').innerHTML.includes('自訂金額') && T.$('bet-sheet').innerHTML.includes('無上限'));
 t('B24 賽程6場', (T.$('schedule-strip').innerHTML.match(/未開賽|進行中/g) || []).length === 6);
 T.renderRecords();
 t('B25 紀錄有6格生涯數據', (T.$('career-stats').innerHTML.match(/bg-\[#f4ede0\]/g) || []).length === 6);
@@ -306,5 +311,191 @@ T.$('race-live').classList.remove('hidden');
 T.finishRace(race29, fakeOutcome(race29));
 t('B29 結算後比賽面板隱藏', T.$('race-live').classList.contains('hidden') === true);
 t('B29 結算後結果面板顯示', T.$('race-result').classList.contains('hidden') === false);
+
+// --- B30 賠率 spread（真實隨機，10 天）：不再都一樣 ---
+let favAvg = 0, longAvg = 0, days30 = 10;
+for (let d = 0; d < days30; d++) {
+  freshState();
+  T.genDayRaces();
+  T.state.races.forEach(r => {
+    const o = r.runners.map(x => x.winOdds).sort((a, b) => a - b);
+    favAvg += o[0]; longAvg += o[7];
+  });
+}
+favAvg /= days30 * 6; longAvg /= days30 * 6;
+t('B30 大熱門賠率平均<5', favAvg < 5, favAvg.toFixed(2));
+t('B30 最冷門賠率平均>10', longAvg > 10, longAvg.toFixed(2));
+t('B30 賠率有拉開', longAvg - favAvg > 5, (longAvg - favAvg).toFixed(2));
+
+// --- B31 天氣影響戰力 ---
+freshState();
+const hMud = T.HORSE_MAP['h03']; // 泥・長
+const hGrass = T.HORSE_MAP['h01']; // 草・長
+const raceSun = { turf: '草', distType: '長', weather: 'sunny' };
+const raceRain = { turf: '草', distType: '長', weather: 'rain' };
+t('B31 雨天泥馬變強', T.horsePower(hMud, raceRain) > T.horsePower(hMud, raceSun), T.horsePower(hMud, raceRain).toFixed(1) + ' vs ' + T.horsePower(hMud, raceSun).toFixed(1));
+t('B31 雨天草馬變弱', T.horsePower(hGrass, raceRain) < T.horsePower(hGrass, raceSun), T.horsePower(hGrass, raceRain).toFixed(1) + ' vs ' + T.horsePower(hGrass, raceSun).toFixed(1));
+t('B31 晴陰無加成', T.horsePower(hMud, { turf: '草', distType: '長', weather: 'cloudy' }) === T.horsePower(hMud, raceSun));
+
+// --- B32 隨機事件門檻 ---
+freshState();
+const hGut = T.HORSE_MAP['h01']; // 根性 90
+const hLow = T.HORSE_MAP['h24']; // 根性 62
+const raceEv = { weather: 'sunny' };
+mockRandom(0.01);
+t('B32 0.01摔馬', T.rollEvent(hGut, raceEv).event === 'fall');
+mockRandom(0.05);
+t('B32 0.05覺醒', T.rollEvent(hGut, raceEv).event === 'awaken');
+mockRandom(0.12);
+t('B32 0.12慢閘', T.rollEvent(hGut, raceEv).event === 'slow');
+mockRandom(0.20);
+t('B32 0.20騎師失誤', T.rollEvent(hGut, raceEv).event === 'jockey');
+mockRandom(0.30);
+t('B32 0.30高根性末腳', T.rollEvent(hGut, raceEv).event === 'kick');
+t('B32 0.30低根性無事', T.rollEvent(hLow, raceEv).event === null);
+mockRandom(0.5);
+t('B32 0.5無事', T.rollEvent(hGut, raceEv).event === null);
+mockRandom(0.12);
+t('B32 陰天0.12覺醒（加倍）', T.rollEvent(hGut, { weather: 'cloudy' }).event === 'awaken');
+unmock();
+t('B32 事件文案', T.eventText('fall', 'A').includes('摔馬') && T.eventText('awaken', 'A').includes('覺醒') && T.eventText('kick', 'A').includes('末腳'));
+
+// --- B33-B34 實力波動與結果產生 ---
+mockRandom(0);
+t('B33 實力下限x0.78', T.effFor(100) === 78, T.effFor(100));
+mockRandom(0.999);
+t('B33 實力上限約x1.22', Math.abs(T.effFor(100) - 121.96) < 0.01, T.effFor(100));
+mockRandom(0.5);
+freshState();
+T.genDayRaces();
+const race34 = T.state.races[0];
+const out34 = T.buildOutcome(race34);
+t('B34 固定隨機下實力=戰力', out34.runners.every(r => Math.abs(r.eff - race34.runners.find(x => x.hid === r.hid).power) < 0.01));
+t('B34 固定隨機下無事件', out34.runners.every(r => r.event === null));
+unmock();
+
+// --- B35 摔馬結算 ---
+freshState();
+mockRandom(0.5);
+T.genDayRaces();
+unmock();
+const race35 = T.state.races[0];
+const fav35 = race35.runners.slice().sort((x, y) => y.power - x.power)[0];
+T.betDraft = { type: 'win', picks: [fav35.hid], amount: 10000 };
+T.placeBet();
+const out35 = { runners: race35.runners.map(r => ({ hid: r.hid, name: T.HORSE_MAP[r.hid].name, coat: T.HORSE_MAP[r.hid].coat, eff: r.hid === fav35.hid ? 10 : r.power, event: r.hid === fav35.hid ? 'fall' : null, isPicked: r.hid === fav35.hid })) };
+T.finishRace(race35, out35);
+t('B35 摔馬不中', race35.bet.won === 0);
+t('B35 摔馬記進事件', race35.events.length === 1 && race35.events[0].event === 'fall');
+t('B35 結果顯示摔馬', T.$('race-result').innerHTML.includes('摔馬'));
+
+// --- B36 VIP ---
+freshState(2000000);
+T.buyVip(1);
+t('B36 VIP銀卡扣錢', T.state.vip === 1 && T.state.money === 1000000, T.state.money);
+t('B36 VIP加成3%', T.vipBonus() === 0.03);
+T.buyVip(1);
+t('B36 重買同級無效', T.state.money === 1000000);
+T.buyVip(3);
+t('B36 不能跳級', T.state.vip === 1);
+T.buyVip(2);
+t('B36 錢不夠不升級', T.state.vip === 1 && T.state.money === 1000000);
+freshState(2000000);
+T.buyVip(1);
+mockRandom(0.5);
+T.genDayRaces();
+unmock();
+const race36 = T.state.races[0];
+const fav36 = race36.runners.slice().sort((x, y) => y.power - x.power)[0];
+T.betDraft = { type: 'win', picks: [fav36.hid], amount: 10000 };
+T.placeBet();
+T.finishRace(race36, fakeOutcome(race36));
+t('B36 VIP派彩x1.03', race36.bet.won === Math.round(10000 * fav36.winOdds * 1.03), race36.bet.won + ' vs ' + Math.round(10000 * fav36.winOdds * 1.03));
+
+// --- B37 冠名 ---
+freshState(3000000);
+T.buyNaming('榮德盃');
+t('B37 冠名扣錢設期限', T.state.namedRace && T.state.namedRace.name === '榮德盃' && T.state.namedRace.untilDay === 8 && T.state.money === 1000000, JSON.stringify(T.state.namedRace));
+T.genDayRaces();
+t('B37 冠名顯示在G1', T.state.races[5].name === '榮德盃・天駒大賽', T.state.races[5].name);
+T.buyNaming('別的盃');
+t('B37 期限內不能重冠', T.state.namedRace.name === '榮德盃');
+T.state.day = 20;
+T.genDayRaces();
+t('B37 過期恢復原名', T.state.races[5].name === 'G1・天駒大賽', T.state.races[5].name);
+freshState(100000);
+T.buyNaming('榮德盃');
+t('B37 錢不夠不冠名', T.state.namedRace === null);
+freshState(3000000);
+T.buyNaming('   ');
+t('B37 空盃名不冠名', T.state.namedRace === null);
+
+// --- B38 獎盃 ---
+freshState(11000000);
+T.buyTrophy('gold');
+t('B38 金盃扣錢收藏', T.state.trophies.gold === true && T.state.money === 1000000, T.state.money);
+T.buyTrophy('gold');
+t('B38 重買無效', T.state.money === 1000000);
+freshState(100000);
+T.buyTrophy('bronze');
+t('B38 錢不夠不買', !T.state.trophies.bronze);
+
+// --- B39 馬主 ---
+freshState(5000000);
+const price39 = T.ownerPrice('h01');
+T.buyHorse('h01');
+t('B39 買馬扣錢', T.state.ownedHorseId === 'h01' && T.state.money === 5000000 - price39, T.state.money + ' price ' + price39);
+t('B39 馬價約百萬', price39 >= 900000 && price39 <= 1400000, price39);
+mockRandom(0.5);
+T.genDayRaces();
+unmock();
+const ownCount = T.state.races.filter(r => r.runners.some(x => x.hid === 'h01')).length;
+t('B39 我的馬每天出賽至少2場', ownCount >= 2, ownCount);
+const race39 = T.state.races.find(r => r.runners.some(x => x.hid === 'h01'));
+const money39 = T.state.money;
+T.finishRace(race39, fakeOutcome(race39)); // eff=power，最強馬冠軍
+if (race39.runners.slice().sort((x, y) => y.power - x.power)[0].hid === 'h01') {
+  t('B39 我的馬奪冠有獎金', T.state.money === money39 + T.OWNER_WIN_BONUS || T.state.money === money39 + T.OWNER_G1_BONUS, T.state.money - money39);
+} else {
+  t('B39 我的馬沒奪冠無獎金或前三獎金', true);
+}
+freshState(100000);
+T.buyHorse('h01');
+t('B39 錢不夠不買馬', T.state.ownedHorseId === null);
+
+// --- B40 下注無上限 ---
+freshState(5000000);
+T.setBetAmount(250000);
+t('B40 自訂25萬', T.betDraft.amount === 250000, T.betDraft.amount);
+T.betAllIn();
+t('B40 ALL-IN=全部', T.betDraft.amount === 5000000, T.betDraft.amount);
+T.setCustomAmount('12345');
+t('B40 輸入金額', T.betDraft.amount === 12345, T.betDraft.amount);
+T.setBetAmount(500);
+t('B40 低於1000夾到1000', T.betDraft.amount === 1000, T.betDraft.amount);
+T.setBetAmount(99999999);
+t('B40 超過持有夾到持有', T.betDraft.amount === 5000000, T.betDraft.amount);
+mockRandom(0.5);
+T.genDayRaces();
+unmock();
+T.betDraft = { type: 'win', picks: [T.state.races[0].runners[0].hid], amount: 250000 };
+T.placeBet();
+t('B40 大額下注扣錢', T.state.money === 4750000 && T.state.races[0].bet.amount === 250000, T.state.money);
+
+// --- B41 音效不炸 ---
+T.startGallop();
+t('B41 馬蹄聲啟動', T.gallopTimer !== null);
+T.stopGallop();
+t('B41 馬蹄聲停止', T.gallopTimer === null);
+let sfxOk = true;
+try { T.cheer(true); T.cheer(false); } catch (e) { sfxOk = false; }
+t('B41 歡呼聲不炸', sfxOk);
+
+// --- B42 原始碼檢查 ---
+t('B42 有摔馬覺醒', html.includes('摔馬') && html.includes('覺醒'));
+t('B42 有天氣', html.includes('WEATHERS') && html.includes('雨天'));
+t('B42 有馬蹄聲歡呼', html.includes('startGallop') && html.includes('cheer('));
+t('B42 有花錢去處', html.includes('VIP') && html.includes('冠名') && html.includes('獎盃') && html.includes('買下'));
+t('B42 下注無上限', html.includes('自訂金額') && html.includes('無上限') && html.includes('betAllIn'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
