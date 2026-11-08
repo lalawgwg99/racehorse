@@ -27,11 +27,11 @@
   .fade-in { animation: fadeIn .25s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .race-scene { position: relative; border-radius: 1rem; overflow: hidden; background-image: url('assets/race-track.webp'); background-size: cover; background-position: center 72%; border: 1px solid #d8cbb3; }
-  .race-lane-row { position: relative; height: 2.2rem; border-bottom: 1px dashed rgba(255,255,255,.55); }
+  .race-lane-row { position: relative; height: 2.6rem; border-bottom: 1px dashed rgba(255,255,255,.55); }
   .race-lane-row:last-child { border-bottom: none; }
-  .race-token { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 1.9rem; height: 1.9rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: #fdfbf3; }
-  .race-token.me { width: 2.2rem; height: 2.2rem; border-color: #d9941a; overflow: hidden; padding: 0; }
-  .race-token.me img { width: 100%; height: 100%; object-fit: cover; }
+  .race-token { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 2.3rem; height: 2.3rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: #fdfbf3; overflow: hidden; padding: 0; }
+  .race-token.me { width: 2.6rem; height: 2.6rem; border-color: #d9941a; }
+  .race-token img { width: 100%; height: 100%; object-fit: cover; }
   .race-token.bob { animation: bob .45s ease-in-out infinite alternate; }
   @keyframes bob { from { margin-top: 0; } to { margin-top: -3px; } }
   .race-flag { position: absolute; right: 2px; top: 0; bottom: 0; width: 3px; background: repeating-linear-gradient(180deg, #1e1a16 0 8px, #fff 8px 16px); z-index: 3; }
@@ -71,7 +71,7 @@
           <span id="stable-count" class="text-xs font-bold text-[#5c5346]"></span>
           <button type="button" id="btn-expand-stable" class="gold-btn text-xs px-3 py-1.5 whitespace-nowrap"></button>
         </div>
-        <div id="stable-list" class="space-y-2 mt-2"></div>
+        <div id="stable-list" class="flex gap-2 mt-2 overflow-x-auto pb-1"></div>
       </div>
       <div id="horse-detail" class="card p-4"></div>
       <div id="equip-panel" class="card p-4"></div>
@@ -100,13 +100,17 @@
         <div id="auto-race-results" class="mt-2"></div>
         <div id="race-list" class="space-y-2 mt-2"></div>
       </div>
-      <div id="jockey-panel" class="card p-4"></div>
       <div id="bet-panel" class="card p-4"></div>
       <div id="race-live" class="card p-4 hidden"></div>
       <div class="card p-4">
         <h2 class="font-black text-base">🎖️ 戰績</h2>
         <div id="race-records" class="text-xs text-[#5c5346] space-y-1 mt-2"></div>
       </div>
+    </section>
+
+    <!-- 騎師 -->
+    <section id="view-jockey" class="space-y-3 hidden">
+      <div id="jockey-panel" class="card p-4"></div>
     </section>
 
     <!-- 商店 -->
@@ -143,6 +147,7 @@
       <button type="button" class="nav-btn active" data-view="stable"><span class="nav-ico">🏇</span><span>馬房</span></button>
       <button type="button" class="nav-btn" data-view="train"><span class="nav-ico">🌱</span><span>育成</span></button>
       <button type="button" class="nav-btn" data-view="race"><span class="nav-ico">🏆</span><span>比賽</span></button>
+      <button type="button" class="nav-btn" data-view="jockey"><span class="nav-ico">🧢</span><span>騎師</span></button>
       <button type="button" class="nav-btn" data-view="shop"><span class="nav-ico">🛒</span><span>商店</span></button>
       <button type="button" class="nav-btn" data-view="hall"><span class="nav-ico">👑</span><span>名人堂</span></button>
     </div>
@@ -421,7 +426,7 @@ function genJockey(grade) {
     const r = Math.random();
     grade = r < 0.5 ? 'rookie' : (r < 0.8 ? 'normal' : (r < 0.95 ? 'elite' : 'ace'));
   }
-  const taken = ((state && state.jockeys ? state.jockeys : []).concat((state && state.shopJockeys) || [])).map(j => j.name);
+  const taken = ((state && state.jockeys ? state.jockeys : []).concat((state && state.jockeyCandidates) || [])).map(j => j.name);
   let name = randPick(JOCKEY_NAMES);
   for (let i = 0; i < 20 && taken.includes(name); i++) name = randPick(JOCKEY_NAMES);
   return { id: uid(), name: name, grade: grade, level: 1, exp: 0, bond: 0 };
@@ -458,7 +463,7 @@ function migrateState() {
     state.jockeys = [j];
     state.activeJockeyId = j.id;
   }
-  if (!state.shopJockeys) state.shopJockeys = [genJockey(), genJockey()];
+  if (!state.jockeyCandidates) state.jockeyCandidates = [];
   if (state.pendingBet === undefined) state.pendingBet = null;
   if (state.legacyPoints === undefined) state.legacyPoints = 0;
   if (state.gachaPity === undefined) state.gachaPity = 0;
@@ -466,7 +471,7 @@ function migrateState() {
   if (!state.redeemedCodes) state.redeemedCodes = [];
   if (!state.stableCap) state.stableCap = 6;
   (state.jockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
-  (state.shopJockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
+  (state.jockeyCandidates || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); if (h.mythicwins === undefined) h.mythicwins = 0; if (!h.coat) { let s2 = 0; for (const ch of String(h.id)) s2 += ch.charCodeAt(0); h.coat = COAT_KEYS[s2 % COAT_KEYS.length]; } });
 }
 function createDefaultState() {
@@ -483,7 +488,7 @@ function createDefaultState() {
     activeHorseId: starter.id,
     shop: [genShopHorse(), genShopHorse(), genShopHorse()],
     shopEquip: [genEquipment(), genEquipment()],
-    shopJockeys: [genJockey(), genJockey()],
+    jockeyCandidates: [],
     equipment: [],
     pendingBet: null,
     shopFreeRefresh: true,
@@ -654,7 +659,7 @@ function advanceWeek() {
         state.legacyPoints = (state.legacyPoints || 0) + lp;
         addLog('🧬 ' + h.name + '留下 ' + lp + ' 個血統點（勝場 ' + h.wins + '、G1 ' + h.g1wins + ' 次），可在馬房傳承給現役馬！');
         if (h.g1wins > 0) {
-          state.hall.push({ name: h.name, g1wins: h.g1wins, wins: h.wins, earnings: h.earnings });
+          state.hall.push({ name: h.name, g1wins: h.g1wins, wins: h.wins, earnings: h.earnings, coat: h.coat });
         }
       }
     });
@@ -662,7 +667,6 @@ function advanceWeek() {
   }
   state.shop = [genShopHorse(), genShopHorse(), genShopHorse()];
   state.shopEquip = [genEquipment(), genEquipment()];
-  state.shopJockeys = [genJockey(), genJockey()];
   state.shopFreeRefresh = true;
 }
 function afterAction() {
@@ -764,7 +768,7 @@ function startRaceAnimation(race, outcome, onFinish, horseImg) {
       + '<div class="text-center mt-2"><button type="button" id="btn-skip-race" class="paper-btn text-xs px-3 py-1.5">⏩ 跳過比賽</button></div>'
       + '<div class="race-scene mt-3"><div class="race-flag"></div>' + outcome.runners.map((r, i) =>
         '<div class="race-lane-row"><span class="lane-name">' + esc(r.name) + '</span>'
-        + '<div class="race-token' + (r.isPlayer ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + (r.isPlayer ? '<img src="' + (horseImg || 'assets/coat-bay.webp') + '" alt="">' : '🐎') + '</div>'
+        + '<div class="race-token' + (r.isPlayer ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + '<img src="' + (r.isPlayer ? (horseImg || 'assets/coat-bay.webp') : COATS[COAT_KEYS[i % COAT_KEYS.length]].img) + '" alt="">' + '</div>'
         + '<span class="lane-pos" id="lane-pos-' + i + '">-</span></div>').join('') + '</div>'
       + '<div id="race-comment" class="text-sm font-bold text-[#1d4d2e] mt-2">閘門開了！各馬衝出起跑線！</div>';
     wireSkip();
@@ -1020,17 +1024,27 @@ function unequipItem(horseId, slot) {
 }
 
 /* ================= 騎師 ================= */
-function hireJockey(idx) {
-  const j = state.shopJockeys[idx];
-  if (!j) return;
+function hireJockey(candidateId) {
+  const idx = (state.jockeyCandidates || []).findIndex(j => j.id === candidateId);
+  if (idx < 0) return;
+  const j = state.jockeyCandidates[idx];
   const fee = JOCKEY_GRADES[j.grade].fee;
   if (state.money < fee) { showToast('金不夠，聘用要 ' + fmt(fee) + ' 金'); return; }
   state.money -= fee;
+  state.jockeyCandidates.splice(idx, 1);
   state.jockeys.push(j);
-  state.shopJockeys.splice(idx, 1);
   state.activeJockeyId = j.id;
   addLog('🤝 聘用騎師' + j.name + '（' + JOCKEY_GRADES[j.grade].label + '），-' + fmt(fee) + ' 金');
   showToast('聘用騎師' + j.name + '！');
+  saveState();
+  renderAll();
+}
+function dismissCandidate(candidateId) {
+  const idx = (state.jockeyCandidates || []).findIndex(j => j.id === candidateId);
+  if (idx < 0) return;
+  const j = state.jockeyCandidates[idx];
+  state.jockeyCandidates.splice(idx, 1);
+  addLog('👋 婉拒騎師' + j.name + '（' + JOCKEY_GRADES[j.grade].label + '）');
   saveState();
   renderAll();
 }
@@ -1230,17 +1244,15 @@ function renderTrainActionsInto(el) {
   });
 }
 function renderStable() {
-  $('stable-count').textContent = '點一匹馬設為主力';
+  $('stable-count').textContent = '點頭像切換馬匹';
   const expBtn = $('btn-expand-stable');
   expBtn.textContent = stableCap() >= STABLE_EXPAND_MAX ? '已滿 ' + STABLE_EXPAND_MAX + ' 格' : '擴建 ＋2 格・' + fmt(expandCost());
   expBtn.onclick = expandStable;
   $('stable-list').innerHTML = state.horses.map(h => {
     const active = h.id === state.activeHorseId;
-    return '<button type="button" data-horse="' + h.id + '" class="w-full text-left p-3 rounded-xl border-2 ' + (active ? 'border-[#d9941a] bg-[#fff8e6]' : 'border-[#e6dcc5] bg-white') + '">'
-      + '<div class="flex items-center gap-2.5"><img src="' + coatImg(h) + '" alt="" class="w-12 h-12 object-cover rounded-lg border border-[#d8cbb3] bg-[#f4ede0] shrink-0" onerror="this.style.display=\'none\'">'
-      + '<div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="font-black text-sm">' + (active ? '⭐ ' : '') + esc(h.name) + (h.retired ? '（已引退）' : '') + '</span>' + rarityTag(h.rarity) + '</div>'
-      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・' + coatLabel(h) + '・' + h.wins + '勝/' + h.races + '戰</div></div></div>'
-      + '</button>';
+    return '<button type="button" data-horse="' + h.id + '" class="shrink-0 w-14 text-center' + (h.retired ? ' opacity-50' : '') + '">'
+      + '<img src="' + coatImg(h) + '" alt="" class="w-14 h-14 object-cover rounded-xl border-2 ' + (active ? 'border-[#d9941a]' : 'border-[#e6dcc5]') + ' bg-[#f4ede0]" onerror="this.style.display=\'none\'">'
+      + '<div class="text-[10px] font-bold mt-0.5 truncate">' + (active ? '⭐ ' : '') + esc(h.name) + '</div></button>';
   }).join('');
   document.querySelectorAll('[data-horse]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1359,15 +1371,19 @@ function renderJockeyPanel() {
         + '<div class="flex items-center gap-1 mt-1.5"><span class="text-[11px]">💛</span><div class="flex-1 h-1.5 rounded-full bg-[#e6dcc5] overflow-hidden"><div class="h-full rounded-full ' + ((jj.bond || 0) >= 80 ? 'bg-[#f6c453]' : 'bg-[#e88ca0]') + '" style="width:' + (jj.bond || 0) + '%"></div></div><span class="text-[11px] font-black">' + (jj.bond || 0) + '</span></div>'
         + '<div class="text-[11px] text-[#5c5346] mt-1">經驗 ' + jj.exp + '/100・出賽 ' + fmt(JOCKEY_GRADES[jj.grade].raceFee) + '金</div></button>';
     }).join('') + '</div>'
-    + '<div class="mt-2 space-y-2">' + state.shopJockeys.map((jj, i) => {
+    + ((state.jockeyCandidates || []).length ? '<h3 class="font-black text-sm mt-3">📋 待聘用 <span class="text-xs font-bold text-[#5c5346]">抽卡抽到的騎師，付聘用費上陣</span></h3><div class="mt-2 space-y-2">' + state.jockeyCandidates.map(jj => {
       return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white flex items-center justify-between gap-2"><div class="min-w-0"><span class="font-black text-sm">' + esc(jj.name) + '</span><span class="text-xs text-[#5c5346]">　' + JOCKEY_GRADES[jj.grade].label + '・速+' + JOCKEY_GRADES[jj.grade].spd + '</span></div>'
-        + '<button type="button" data-hire="' + i + '" class="green-btn text-xs px-3 py-1.5 whitespace-nowrap">聘用 ' + fmt(JOCKEY_GRADES[jj.grade].fee) + '</button></div>';
-    }).join('') + '</div>';
+        + '<div class="flex gap-1.5 shrink-0"><button type="button" data-hire="' + jj.id + '" class="green-btn text-xs px-3 py-1.5 whitespace-nowrap">聘用 ' + fmt(JOCKEY_GRADES[jj.grade].fee) + '</button>'
+        + '<button type="button" data-dismiss="' + jj.id + '" class="paper-btn text-xs px-2 py-1.5 whitespace-nowrap">婉拒</button></div></div>';
+    }).join('') + '</div>' : '<p class="text-xs text-[#5c5346] mt-2">💡 騎師只能抽卡獲得，抽到後付聘用費就能上陣。</p>');
   document.querySelectorAll('[data-jockey]').forEach(btn => {
     btn.addEventListener('click', () => { state.activeJockeyId = btn.getAttribute('data-jockey'); saveState(); renderAll(); });
   });
   document.querySelectorAll('[data-hire]').forEach(btn => {
-    btn.addEventListener('click', () => hireJockey(Number(btn.getAttribute('data-hire'))));
+    btn.addEventListener('click', () => hireJockey(btn.getAttribute('data-hire')));
+  });
+  document.querySelectorAll('[data-dismiss]').forEach(btn => {
+    btn.addEventListener('click', () => dismissCandidate(btn.getAttribute('data-dismiss')));
   });
 }
 function renderBetPanel() {
@@ -1420,7 +1436,6 @@ function renderBetPanel() {
   if (br) br.addEventListener('change', renderBetPanel);
 }
 function renderRace() {
-  renderJockeyPanel();
   renderBetPanel();
   $('btn-auto-race').addEventListener('click', autoRaceAll);
   const ar = $('auto-race-results');
@@ -1537,7 +1552,7 @@ function drawGacha(count) {
       state.equipment.push(it.equip);
       results.push({ kind: 'equip', name: it.equip.name, tier: it.equip.tier, kept: true });
     } else {
-      state.jockeys.push(it.jockey);
+      state.jockeyCandidates.push(it.jockey);
       results.push({ kind: 'jockey', name: it.jockey.name, grade: it.jockey.grade, kept: true });
     }
   });
@@ -1556,7 +1571,7 @@ function renderGachaPanel() {
   const panel = $('gacha-panel');
   const pityLeft = 10 - (state.gachaPity || 0);
   let html = '<h2 class="font-black text-base">🎰 抽卡 <span class="text-xs font-bold text-[#5c5346]">馬 50%・裝備 30%・騎師 20%</span></h2>'
-    + '<p class="text-xs text-[#5c5346] mt-1">每 10 抽必出高稀有，保底還差 <b>' + pityLeft + '</b> 抽；馬房滿了多抽的馬自動放生領小額金。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-1">每 10 抽必出高稀有，保底還差 <b>' + pityLeft + '</b> 抽；馬房滿了多抽的馬自動放生領小額金；騎師抽到後付聘用費上陣。</p>'
     + '<details class="text-xs text-[#5c5346] mt-1"><summary>詳細機率</summary><p class="mt-1">馬：普通 43%／良血 30%／名門 18%／傳奇 7%／神話 2%；裝備：粗製 55%／精良 25%／名匠 15%／傳奇 5%；騎師：見習 50%／普通 30%／精英 15%／王牌 5%。放生金：普通 1,000／良血 2,000／名門 5,000／傳奇 10,000／神話 20,000。</p></details>'
     + '<div class="grid grid-cols-2 gap-2 mt-2">'
     + '<button type="button" id="btn-gacha-1" class="gold-btn text-sm px-4 py-2.5">單抽' + (state.gachaFreeUsed ? '・10,000 金' : '・首次免費') + '</button>'
@@ -1566,7 +1581,7 @@ function renderGachaPanel() {
     html += '<div class="mt-3 space-y-1.5">' + lastGachaResults.map(r => {
       const high = (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend' || r.rarity === 'mythic')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
       const label = r.kind === 'horse' ? '🐴 ' + esc(r.name) + '（' + RARITY[r.rarity].label + '・' + (COATS[r.coat] ? COATS[r.coat].label : '栗毛') + '）' : (r.kind === 'equip' ? '🎒 ' + esc(r.name) : '🧢 ' + esc(r.name));
-      return '<div class="flex items-center justify-between text-xs p-2 rounded-lg ' + (high ? 'bg-[#fff8e6] border border-[#d9941a] font-black' : 'bg-white border border-[#e6dcc5]') + '"><span>' + label + '</span><span>' + (r.kept ? '✅ 已保留' : '🕊️ 放生 +' + fmt(r.soldFor) + ' 金') + '</span></div>';
+      return '<div class="flex items-center justify-between text-xs p-2 rounded-lg ' + (high ? 'bg-[#fff8e6] border border-[#d9941a] font-black' : 'bg-white border border-[#e6dcc5]') + '"><span>' + label + '</span><span>' + (r.kind === 'jockey' ? '📋 待聘用' : (r.kept ? '✅ 已保留' : '🕊️ 放生 +' + fmt(r.soldFor) + ' 金')) + '</span></div>';
     }).join('') + '</div>';
   }
   panel.innerHTML = html;
@@ -1615,13 +1630,14 @@ function renderAll() {
   renderStable();
   renderTrain();
   renderRace();
+  renderJockeyPanel();
   renderShop();
   renderHall();
 }
 function switchView(view) {
   sfx('tap');
   currentView = view;
-  ['stable', 'train', 'race', 'shop', 'hall'].forEach(v => {
+  ['stable', 'train', 'race', 'jockey', 'shop', 'hall'].forEach(v => {
     $('view-' + v).classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-btn').forEach(btn => {

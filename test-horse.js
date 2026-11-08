@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,coatImg,coatLabel,groupEquip,equipIcon,COATS,COAT_KEYS,renderEquipPanel,renderStable,renderTrain,renderJockeyPanel,renderRace,renderGachaPanel,renderBetPanel,renderBreedPanel,renderHall,getTrainActions,renderTrainActionsInto,$,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,coatImg,coatLabel,groupEquip,equipIcon,COATS,COAT_KEYS,renderEquipPanel,renderStable,renderTrain,renderJockeyPanel,renderRace,renderGachaPanel,renderBetPanel,renderBreedPanel,renderHall,getTrainActions,renderTrainActionsInto,switchView,dismissCandidate,$,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -260,10 +260,16 @@ const powBare = T.calcPower(T.state.horses[0], T.RACES[0]);
 t('T14 有騎師比沒騎師強', powWithJ > powBare, powWithJ + ' vs ' + powBare);
 T.state.activeJockeyId = j0.id;
 T.state.money = 1000000;
-const hireFee = T.JOCKEY_GRADES[T.state.shopJockeys[0].grade].fee;
-T.hireJockey(0);
-t('T14 聘用騎師扣錢', T.state.money === 1000000 - hireFee);
-t('T14 聘用後成主力騎師', T.state.jockeys.length === 2);
+var cand14 = T.genJockey('elite');
+T.state.jockeyCandidates = [cand14];
+const hireFee = T.JOCKEY_GRADES[cand14.grade].fee;
+T.hireJockey(cand14.id);
+t('T14 聘用騎師扣錢', T.state.money === 1000000 - hireFee, T.state.money);
+t('T14 聘用後成主力騎師', T.state.jockeys.length === 2 && T.state.jockeyCandidates.length === 0, T.state.jockeys.length);
+T.state.jockeyCandidates = [T.genJockey('ace')];
+T.state.money = 100;
+T.hireJockey(T.state.jockeyCandidates[0].id);
+t('T14 金不夠聘用被擋', T.state.jockeys.length === 2 && T.state.jockeyCandidates.length === 1, T.state.jockeyCandidates.length);
 
 // --- T15 配種 ---
 T.state = T.createDefaultState();
@@ -331,7 +337,7 @@ t('T17b 下注鎖定賠率＝顯示賠率', T.state.pendingBet.winOdds === o1.wi
 
 // --- T17 舊存檔遷移 ---
 T.state = T.createDefaultState();
-delete T.state.equipment; delete T.state.shopEquip; delete T.state.jockeys; delete T.state.shopJockeys; delete T.state.activeJockeyId; delete T.state.pendingBet;
+delete T.state.equipment; delete T.state.shopEquip; delete T.state.jockeys; delete T.state.jockeyCandidates; delete T.state.activeJockeyId; delete T.state.pendingBet;
 delete T.state.horses[0].equipment;
 T.migrateState();
 t('T17 遷移補裝備欄', Array.isArray(T.state.equipment));
@@ -698,6 +704,59 @@ T.renderGachaPanel();
 var html46g = T.$('gacha-panel').innerHTML;
 t('T46 抽卡機率收進details', html46g.includes('<details'), html46g.includes('<details'));
 t('T46 抽卡短版仍有保底', html46g.includes('保底還差'), html46g.includes('保底還差'));
+
+// --- T47 騎師獨立一頁 ---
+T.state = T.createDefaultState();
+T.state.jockeys = [T.genJockey('rookie'), T.genJockey('elite')];
+T.$('jockey-panel').innerHTML = 'MARKER';
+T.renderRace();
+t('T47 比賽頁不再渲染騎師', T.$('jockey-panel').innerHTML === 'MARKER', T.$('jockey-panel').innerHTML);
+T.switchView('jockey');
+t('T47 騎師頁顯示', !T.$('view-jockey').classList.contains('hidden'), 'view-jockey hidden?');
+t('T47 切到騎師頁比賽頁隱藏', T.$('view-race').classList.contains('hidden'), 'view-race visible?');
+T.renderJockeyPanel();
+t('T47 騎師頁有兩欄卡片', T.$('jockey-panel').innerHTML.includes('grid grid-cols-2'), T.$('jockey-panel').innerHTML.length);
+
+// --- T48 騎師只能抽卡獲得，聘用要錢 ---
+T.state = T.createDefaultState();
+T.state.money = 100000;
+T.state.gachaFreeUsed = true;
+var jCount0 = T.state.jockeys.length;
+mockRandom(0.9);
+T.drawGacha(1);
+unmock();
+t('T48 抽卡騎師進待聘用', T.state.jockeyCandidates.length === 1, T.state.jockeyCandidates.length);
+t('T48 抽卡騎師不直接入隊', T.state.jockeys.length === jCount0, T.state.jockeys.length);
+var cand48 = T.state.jockeyCandidates[0];
+var fee48 = T.JOCKEY_GRADES[cand48.grade].fee;
+var money48 = T.state.money;
+T.hireJockey(cand48.id);
+t('T48 聘用扣聘用費', T.state.money === money48 - fee48, T.state.money);
+t('T48 聘用後入隊', T.state.jockeys.length === jCount0 + 1 && T.state.jockeyCandidates.length === 0, T.state.jockeys.length);
+var cand48b = T.genJockey('normal');
+T.state.jockeyCandidates = [cand48b];
+T.dismissCandidate(cand48b.id);
+t('T48 婉拒移除候選', T.state.jockeyCandidates.length === 0, T.state.jockeyCandidates.length);
+T.migrateState();
+t('T48 舊存檔補候選欄位', Array.isArray(T.state.jockeyCandidates), typeof T.state.jockeyCandidates);
+
+// --- T49 比賽畫面對手也用毛色圖 ---
+t('T49 騎師獨立section存在', html.includes('id="view-jockey"'), html.includes('view-jockey'));
+t('T49 對手棋子用毛色圖', html.includes('COAT_KEYS[i % COAT_KEYS.length]'), html.includes('COAT_KEYS[i'));
+t('T49 棋子放大', html.includes('width: 2.3rem; height: 2.3rem'), html.includes('2.3rem'));
+t('T49 沒有殘留shopJockeys', !html.includes('shopJockeys'), html.includes('shopJockeys'));
+
+// --- T50 馬房列表改頭像橫條，不再重複詳情資料 ---
+T.state = T.createDefaultState();
+T.state.horses = [T.newHorse({}), T.newHorse({})];
+T.state.horses[0].coat = 'black';
+T.state.horses[1].coat = 'white';
+T.renderStable();
+var html50 = T.$('stable-list').innerHTML;
+t('T50 列表是頭像橫條', html50.includes('w-14 h-14'), html50.includes('w-14'));
+t('T50 列表不再重複戰績文字', !html50.includes('勝/'), html50.includes('勝/'));
+t('T50 列表仍有毛色圖', html50.includes('assets/coat-black.webp') && html50.includes('assets/coat-white.webp'), html50.includes('assets/coat-'));
+t('T50 詳情仍在下方', T.$('horse-detail').innerHTML.includes('本週行動'), T.$('horse-detail').innerHTML.length);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
