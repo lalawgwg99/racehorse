@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,coatImg,coatLabel,groupEquip,equipIcon,COATS,COAT_KEYS,renderEquipPanel,renderStable,$,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,coatImg,coatLabel,groupEquip,equipIcon,COATS,COAT_KEYS,renderEquipPanel,renderStable,renderTrain,renderJockeyPanel,renderRace,renderGachaPanel,renderBetPanel,renderBreedPanel,renderHall,getTrainActions,renderTrainActionsInto,$,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -670,6 +670,34 @@ T.state.horses[1].coat = 'white';
 T.renderStable();
 var html44 = T.$('stable-list').innerHTML;
 t('T44 列表有毛色圖', html44.includes('assets/coat-black.webp') && html44.includes('assets/coat-white.webp'), html44.includes('assets/coat-'));
+
+// --- T45 馬房詳情下方直接有育成按鈕 ---
+T.state = T.createDefaultState();
+var h45 = T.state.horses[0];
+T.renderStable();
+t('T45 詳情有本週行動區', T.$('horse-detail').innerHTML.includes('stable-train-actions'), T.$('horse-detail').innerHTML.includes('stable-train-actions'));
+t('T45 行動區有9顆按鈕', T.$('stable-train-actions').innerHTML.includes('速度訓練') && T.$('stable-train-actions').innerHTML.includes('💼 打工'), T.$('stable-train-actions').innerHTML.length);
+t('T45 getTrainActions共9項', T.getTrainActions().length === 9, T.getTrainActions().length);
+h45.retired = true;
+T.renderStable();
+t('T45 引退馬不顯示行動區', !T.$('horse-detail').innerHTML.includes('stable-train-actions'), T.$('horse-detail').innerHTML.includes('stable-train-actions'));
+
+// --- T46 文字瘦身：騎師兩欄、比賽單行、抽卡收合 ---
+T.state = T.createDefaultState();
+T.state.jockeys = [T.genJockey('rookie'), T.genJockey('elite'), T.genJockey('ace')];
+T.renderJockeyPanel();
+var html46j = T.$('jockey-panel').innerHTML;
+t('T46 騎師改兩欄格', html46j.includes('grid grid-cols-2'), html46j.includes('grid grid-cols-2'));
+t('T46 彩圈規則只寫一次', (html46j.match(/滿 80 進彩圈/g) || []).length === 1, (html46j.match(/滿 80 進彩圈/g) || []).length);
+t('T46 騎師加成用小標籤', html46j.includes('速+'), html46j.includes('速+'));
+T.renderRace();
+var html46r = T.$('race-list').innerHTML;
+t('T46 比賽卡片變單行列', html46r.includes('flex items-center gap-2') && html46r.includes('報名'), html46r.includes('報名'));
+t('T46 比賽不再整排大按鈕', !html46r.includes('py-2 mt-2 w-full'), html46r.includes('py-2 mt-2 w-full'));
+T.renderGachaPanel();
+var html46g = T.$('gacha-panel').innerHTML;
+t('T46 抽卡機率收進details', html46g.includes('<details'), html46g.includes('<details'));
+t('T46 抽卡短版仍有保底', html46g.includes('保底還差'), html46g.includes('保底還差'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

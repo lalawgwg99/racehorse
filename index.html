@@ -700,10 +700,10 @@ function calcRaceOutcome(h, race) {
   return { runners: runners, myRank: me.rank };
 }
 function raceEligible(h, race) {
-  if (!h || h.retired) return '請先選一匹現役馬';
-  if (h.age < race.minAge) return '要 ' + race.minAge + ' 歲才能參加';
-  if (h.wins < race.minWins) return '需要 ' + race.minWins + ' 勝才能報名';
-  if (h.energy < 25) return '體力不足 25，先休息';
+  if (!h || h.retired) return '先選現役馬';
+  if (h.age < race.minAge) return '要 ' + race.minAge + ' 歲';
+  if (h.wins < race.minWins) return '要 ' + race.minWins + ' 勝';
+  if (h.energy < 25) return '體力不足';
   return null;
 }
 function raceCommentAt(prog, leaderName) {
@@ -1207,6 +1207,28 @@ function renderHeader() {
   $('header-money').textContent = '💰 ' + fmt(state.money);
   $('header-horses').textContent = '馬房 ' + state.horses.length + '/' + stableCap();
 }
+function getTrainActions() {
+  return [
+    { label: '速度訓練', sub: '體力-22', fn: () => doTrain('spd'), cls: 'gold-btn' },
+    { label: '耐力訓練', sub: '體力-22', fn: () => doTrain('sta'), cls: 'gold-btn' },
+    { label: '力量訓練', sub: '體力-22', fn: () => doTrain('pow'), cls: 'gold-btn' },
+    { label: '根性訓練', sub: '體力-22', fn: () => doTrain('gut'), cls: 'gold-btn' },
+    { label: '智慧訓練', sub: '體力-22', fn: () => doTrain('wis'), cls: 'gold-btn' },
+    { label: '休息', sub: '體力+35', fn: doRest, cls: 'green-btn' },
+    { label: '散步', sub: '心情+1・體力+12', fn: doWalk, cls: 'green-btn' },
+    { label: '特級飼料', sub: '800金・體力+25', fn: doFeed, cls: 'ink-btn' },
+    { label: '💼 打工', sub: '+10,000金・體力+15', fn: doWork, cls: 'green-btn' },
+  ];
+}
+function renderTrainActionsInto(el) {
+  if (!el) return;
+  const acts = getTrainActions();
+  el.innerHTML = acts.map((a, i) =>
+    '<button type="button" data-act="' + i + '" class="' + a.cls + ' px-2 py-3 text-sm">' + a.label + '<div class="text-[11px] font-bold opacity-80">' + a.sub + '</div></button>').join('');
+  el.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => { acts[Number(btn.getAttribute('data-act'))].fn(); });
+  });
+}
 function renderStable() {
   $('stable-count').textContent = '點一匹馬設為主力';
   const expBtn = $('btn-expand-stable');
@@ -1217,7 +1239,7 @@ function renderStable() {
     return '<button type="button" data-horse="' + h.id + '" class="w-full text-left p-3 rounded-xl border-2 ' + (active ? 'border-[#d9941a] bg-[#fff8e6]' : 'border-[#e6dcc5] bg-white') + '">'
       + '<div class="flex items-center gap-2.5"><img src="' + coatImg(h) + '" alt="" class="w-12 h-12 object-cover rounded-lg border border-[#d8cbb3] bg-[#f4ede0] shrink-0" onerror="this.style.display=\'none\'">'
       + '<div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="font-black text-sm">' + (active ? '⭐ ' : '') + esc(h.name) + (h.retired ? '（已引退）' : '') + '</span>' + rarityTag(h.rarity) + '</div>'
-      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・' + coatLabel(h) + '・戰績 ' + h.wins + '勝/' + h.races + '戰・獎金 ' + fmt(h.earnings) + '</div></div></div>'
+      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・' + coatLabel(h) + '・' + h.wins + '勝/' + h.races + '戰</div></div></div>'
       + '</button>';
   }).join('');
   document.querySelectorAll('[data-horse]').forEach(btn => {
@@ -1235,18 +1257,20 @@ function renderStable() {
     + '<img src="' + coatImg(h) + '" alt="賽馬" class="w-24 h-24 object-cover rounded-xl border border-[#d8cbb3] bg-[#f4ede0]" onerror="this.style.display=\'none\'">'
     + '<div class="flex-1"><div class="flex items-center gap-2 flex-wrap"><span class="font-black text-base">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
     + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離</div>'
-    + (personaOf(h) ? '<div class="text-xs mt-1">🎭 ' + esc(h.persona) + '：' + esc(personaOf(h).desc) + '｜弱點：' + esc(personaOf(h).weakLabel) + (h.rival ? '｜宿敵：' + esc(h.rival) : '') + '</div>' : '')
+    + (personaOf(h) ? '<div class="flex flex-wrap gap-1 mt-1.5"><span class="text-[11px] font-bold bg-[#f4ede0] rounded-full px-2 py-0.5">🎭 ' + esc(h.persona) + '</span><span class="text-[11px] font-bold bg-[#f4ede0] rounded-full px-2 py-0.5">弱點：' + esc(personaOf(h).weakLabel) + '</span>' + (h.rival ? '<span class="text-[11px] font-bold bg-[#f4ede0] rounded-full px-2 py-0.5">宿敵：' + esc(h.rival) + '</span>' : '') + '</div>' : '')
     + '<div class="text-xs mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b></div>'
     + '<div class="text-xs mt-1">戰績 <b>' + h.wins + '勝 / ' + h.races + '戰</b>・累積獎金 <b>' + fmt(h.earnings) + '</b>・G1 冠軍 <b>' + h.g1wins + '</b> 次</div></div></div>'
     + '<div class="space-y-1.5 mt-3">'
     + statBar('速度', h.stats.spd, '#d9941a') + statBar('耐力', h.stats.sta, '#1d6b41')
     + statBar('力量', h.stats.pow, '#9e2a22') + statBar('根性', h.stats.gut, '#1d4ed8')
     + statBar('智慧', h.stats.wis, '#7c3aed') + '</div>'
-    + '<p class="text-[11px] text-[#5c5346] mt-2">' + RARITY[h.rarity].label + '馬成長上限 ' + cap + '。' + (h.retired ? '已引退，不能再訓練或比賽，但可以配種。' : (h.age >= 7 ? '已過巔峰期，每年全屬性 -3。' : '巔峰期在 2～6 歲，把握黃金時間。')) + '</p>'
+    + '<p class="text-[11px] text-[#5c5346] mt-2">' + RARITY[h.rarity].label + '・上限 ' + cap + (h.retired ? '・已引退（可配種）' : (h.age >= 7 ? '・已過巔峰，每年 -3' : '・巔峰期 2～6 歲')) + '</p>'
+    + (!h.retired ? '<div class="mt-3"><div class="text-xs font-black mb-1.5">⚡ 本週行動 <span class="text-[#5c5346] font-bold">點一下就練，不用切到育成頁</span></div><div id="stable-train-actions" class="grid grid-cols-2 gap-2"></div></div>' : '')
     + '<div class="mt-3 p-2.5 rounded-xl border border-[#e6dcc5] bg-[#fff8e6]"><div class="text-xs font-black">🧬 血統傳承　<span class="text-[#5c5346] font-bold">血統點 ' + (state.legacyPoints || 0) + '（馬匹引退時留下）</span></div>'
-    + ((state.legacyPoints || 0) > 0 ? '<div class="flex flex-wrap gap-1.5 mt-2">' + ['spd', 'sta', 'pow', 'gut', 'wis'].map(k => '<button type="button" data-legacy="' + k + '" class="paper-btn text-xs px-2 py-1">' + STAT_LABEL[k] + ' +5</button>').join('') + '</div>' : '<div class="text-[11px] text-[#9a8f7a] mt-1">還沒有血統點，讓一匹馬跑到 10 歲引退就能留下。</div>') + '</div>'
+    + ((state.legacyPoints || 0) > 0 ? '<div class="flex flex-wrap gap-1.5 mt-2">' + ['spd', 'sta', 'pow', 'gut', 'wis'].map(k => '<button type="button" data-legacy="' + k + '" class="paper-btn text-xs px-2 py-1">' + STAT_LABEL[k] + ' +5</button>').join('') + '</div>' : '<div class="text-[11px] text-[#9a8f7a] mt-1">引退一匹馬可留 1 點。</div>') + '</div>'
     + '<button type="button" id="btn-sell-horse" class="paper-btn text-xs px-3 py-2 mt-3">賣掉這匹馬</button>';
   $('btn-sell-horse').addEventListener('click', () => sellHorse(h.id));
+  renderTrainActionsInto($('stable-train-actions'));
   document.querySelectorAll('[data-legacy]').forEach(btn => {
     btn.addEventListener('click', () => spendLegacy(btn.getAttribute('data-legacy')));
   });
@@ -1293,7 +1317,7 @@ function renderBreedPanel() {
   const females = state.horses.filter(h => h.sex === '母');
   const canBreed = males.length && females.length && state.horses.length < stableCap();
   panel.innerHTML = '<h2 class="font-black text-base">🐴 繁殖配種 <span class="text-xs font-bold text-[#5c5346]">配種費 ' + fmt(BREED_COST) + ' 金</span></h2>'
-    + '<p class="text-xs text-[#5c5346] mt-1">子嗣五圍取父母平均 ± 浮動，15% 機率突變 +5，稀有度取較高者、20% 機率升一階。出生即 2 歲，可直接育成。引退馬也可以配種。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-1">子嗣取父母平均，15% 突變 +5，20% 升一階；引退馬可配種。</p>'
     + '<div class="grid grid-cols-2 gap-2 mt-2">'
     + '<select id="breed-sire" class="card p-2 text-sm font-bold w-full">' + males.map(m => '<option value="' + m.id + '">' + esc(m.name) + '（' + RARITY[m.rarity].label + '）</option>').join('') + '</select>'
     + '<select id="breed-dam" class="card p-2 text-sm font-bold w-full">' + females.map(m => '<option value="' + m.id + '">' + esc(m.name) + '（' + RARITY[m.rarity].label + '）</option>').join('') + '</select>'
@@ -1307,7 +1331,7 @@ function renderTrain() {
   const h = activeHorse();
   const sum = $('train-horse-summary');
   if (!h) {
-    sum.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的，去商店買一匹馬吧。沒錢的話先打工賺錢。</p>';
+    sum.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的，去商店買馬；沒錢先打工。</p>';
     $('train-actions').innerHTML = '<button type="button" id="btn-work-only" class="green-btn px-2 py-3 text-sm w-full">💼 打工賺錢<div class="text-[11px] font-bold opacity-80">+10,000 金／週</div></button>';
     $('btn-work-only').addEventListener('click', doWork);
     $('train-log').innerHTML = state.logs.slice(0, 8).map(l => '<div><span class="text-[#9a8f7a]">' + esc(l.week) + '</span>　' + esc(l.text) + '</div>').join('');
@@ -1316,40 +1340,28 @@ function renderTrain() {
   sum.innerHTML = '<div class="flex items-center justify-between"><span class="font-black">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
     + '<div class="text-xs text-[#5c5346] mt-1">體力 <b>' + h.energy + '/100</b>・心情 <b class="mood-' + h.mood + '">' + MOOD_LABEL[h.mood] + '</b>・' + h.age + '歲・戰績 ' + h.wins + '勝/' + h.races + '戰</div>'
     + '<div class="stat-bar mt-2"><div class="stat-fill" style="width:' + h.energy + '%;background:' + (h.energy < 25 ? '#9e2a22' : '#1d6b41') + '"></div></div>'
-    + (state.money < 10000 ? '<p class="text-xs font-bold text-[#9e2a22] mt-1">💡 金不多了：打工賺 10,000 金／週，或賣馬換金。</p>' : '');
-  const acts = [
-    { label: '速度訓練', sub: '體力 -22', fn: () => doTrain('spd'), cls: 'gold-btn' },
-    { label: '耐力訓練', sub: '體力 -22', fn: () => doTrain('sta'), cls: 'gold-btn' },
-    { label: '力量訓練', sub: '體力 -22', fn: () => doTrain('pow'), cls: 'gold-btn' },
-    { label: '根性訓練', sub: '體力 -22', fn: () => doTrain('gut'), cls: 'gold-btn' },
-    { label: '智慧訓練', sub: '體力 -22', fn: () => doTrain('wis'), cls: 'gold-btn' },
-    { label: '休息', sub: '體力 +35（上限 100）', fn: doRest, cls: 'green-btn' },
-    { label: '散步', sub: '心情 +1・體力 +12', fn: doWalk, cls: 'green-btn' },
-    { label: '特級飼料', sub: '800 金・體力 +25', fn: doFeed, cls: 'ink-btn' },
-    { label: '💼 打工', sub: '+10,000 金・體力 +15', fn: doWork, cls: 'green-btn' },
-  ];
-  $('train-actions').innerHTML = acts.map((a, i) =>
-    '<button type="button" data-act="' + i + '" class="' + a.cls + ' px-2 py-3 text-sm">' + a.label + '<div class="text-[11px] font-bold opacity-80">' + a.sub + '</div></button>').join('');
-  document.querySelectorAll('[data-act]').forEach(btn => {
-    btn.addEventListener('click', () => { acts[Number(btn.getAttribute('data-act'))].fn(); });
-  });
+    + (state.money < 10000 ? '<p class="text-xs font-bold text-[#9e2a22] mt-1">💡 金不多了：打工 +10,000／週。</p>' : '');
+  renderTrainActionsInto($('train-actions'));
   $('train-log').innerHTML = state.logs.slice(0, 8).map(l => '<div><span class="text-[#9a8f7a]">' + esc(l.week) + '</span>　' + esc(l.text) + '</div>').join('');
 }
 function renderJockeyPanel() {
   const panel = $('jockey-panel');
   const j = activeJockey();
-  panel.innerHTML = '<h2 class="font-black text-base">🧢 騎師 <span class="text-xs font-bold text-[#5c5346]">出賽加成直接算進戰力，勝場升等</span></h2>'
-    + '<div class="space-y-2 mt-2">' + state.jockeys.map(jj => {
+  const gradeColor = g => (g === 'ace' ? '#d9941a' : g === 'elite' ? '#1d4ed8' : g === 'normal' ? '#1d6b41' : '#5c5346');
+  panel.innerHTML = '<h2 class="font-black text-base">🧢 騎師 <span class="text-xs font-bold text-[#5c5346]">點一人設為出賽騎師・羈絆滿 80 進彩圈，加成翻倍</span></h2>'
+    + '<div class="grid grid-cols-2 gap-2 mt-2">' + state.jockeys.map(jj => {
       const b = jockeyBonus(jj);
       const active = jj.id === (j && j.id);
+      const chips = [['速', b.spd], ['智', b.wis], ['根', b.gut]].filter(x => x[1] > 0).map(x => '<span class="bg-[#f4ede0] rounded px-1.5 py-0.5">' + x[0] + '+' + x[1] + '</span>').join('');
       return '<button type="button" data-jockey="' + jj.id + '" class="w-full text-left p-2.5 rounded-xl border-2 ' + (active ? 'border-[#d9941a] bg-[#fff8e6]' : 'border-[#e6dcc5] bg-white') + '">'
-        + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + (active ? '⭐ ' : '') + esc(jj.name) + '・Lv' + jj.level + '</span><span class="text-xs font-black" style="color:' + (jj.grade === 'ace' ? '#d9941a' : jj.grade === 'elite' ? '#1d4ed8' : jj.grade === 'normal' ? '#1d6b41' : '#5c5346') + '">' + JOCKEY_GRADES[jj.grade].label + '</span></div>'
-        + '<div class="text-xs text-[#5c5346] mt-0.5">速度 +' + b.spd + '・智慧 +' + b.wis + '・根性 +' + b.gut + '・經驗 ' + jj.exp + '/100・出賽費 ' + fmt(JOCKEY_GRADES[jj.grade].raceFee) + ' 金</div>'
-        + '<div class="mt-1.5"><div class="flex justify-between text-[11px] font-bold"><span>💛 羈絆 ' + (jj.bond || 0) + '/100</span>' + ((jj.bond || 0) >= 80 ? '<span class="text-[#d9941a]">🔥 彩圈！加成翻倍</span>' : '<span class="text-[#9a8f7a]">滿 80 進彩圈，加成翻倍</span>') + '</div><div class="h-2 rounded-full bg-[#e6dcc5] mt-0.5 overflow-hidden"><div class="h-full rounded-full ' + ((jj.bond || 0) >= 80 ? 'bg-[#f6c453]' : 'bg-[#e88ca0]') + '" style="width:' + (jj.bond || 0) + '%"></div></div></div></button>';
+        + '<div class="flex items-center justify-between gap-1"><span class="font-black text-sm truncate">' + (active ? '⭐ ' : '') + esc(jj.name) + '・Lv' + jj.level + '</span><span class="text-[11px] font-black shrink-0" style="color:' + gradeColor(jj.grade) + '">' + JOCKEY_GRADES[jj.grade].label + '</span></div>'
+        + '<div class="flex flex-wrap gap-1 mt-1 text-[11px] font-bold">' + chips + '</div>'
+        + '<div class="flex items-center gap-1 mt-1.5"><span class="text-[11px]">💛</span><div class="flex-1 h-1.5 rounded-full bg-[#e6dcc5] overflow-hidden"><div class="h-full rounded-full ' + ((jj.bond || 0) >= 80 ? 'bg-[#f6c453]' : 'bg-[#e88ca0]') + '" style="width:' + (jj.bond || 0) + '%"></div></div><span class="text-[11px] font-black">' + (jj.bond || 0) + '</span></div>'
+        + '<div class="text-[11px] text-[#5c5346] mt-1">經驗 ' + jj.exp + '/100・出賽 ' + fmt(JOCKEY_GRADES[jj.grade].raceFee) + '金</div></button>';
     }).join('') + '</div>'
     + '<div class="mt-2 space-y-2">' + state.shopJockeys.map((jj, i) => {
-      return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white flex items-center justify-between"><div><span class="font-black text-sm">' + esc(jj.name) + '</span><span class="text-xs text-[#5c5346]">　' + JOCKEY_GRADES[jj.grade].label + '・速度 +' + JOCKEY_GRADES[jj.grade].spd + '</span></div>'
-        + '<button type="button" data-hire="' + i + '" class="green-btn text-xs px-3 py-1.5">聘用 ' + fmt(JOCKEY_GRADES[jj.grade].fee) + '</button></div>';
+      return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white flex items-center justify-between gap-2"><div class="min-w-0"><span class="font-black text-sm">' + esc(jj.name) + '</span><span class="text-xs text-[#5c5346]">　' + JOCKEY_GRADES[jj.grade].label + '・速+' + JOCKEY_GRADES[jj.grade].spd + '</span></div>'
+        + '<button type="button" data-hire="' + i + '" class="green-btn text-xs px-3 py-1.5 whitespace-nowrap">聘用 ' + fmt(JOCKEY_GRADES[jj.grade].fee) + '</button></div>';
     }).join('') + '</div>';
   document.querySelectorAll('[data-jockey]').forEach(btn => {
     btn.addEventListener('click', () => { state.activeJockeyId = btn.getAttribute('data-jockey'); saveState(); renderAll(); });
@@ -1369,18 +1381,18 @@ function renderBetPanel() {
   if (state.pendingBet) {
     const b = state.pendingBet;
     const br = RACES.find(r => r.id === b.raceId);
-    html += '<div class="p-2.5 rounded-xl bg-[#fff8e6] border border-[#d9941a] mt-2 text-sm">已下注：<b>' + esc(br ? br.name : '') + '「' + (b.type === 'win' ? '獨贏' : '位置') + '」' + fmt(b.amount) + ' 金</b>，賠率 ' + (b.type === 'win' ? b.winOdds : b.placeOdds) + '（' + (b.type === 'win' ? '要拿冠軍' : '前三名就中') + '）'
+    html += '<div class="p-2.5 rounded-xl bg-[#fff8e6] border border-[#d9941a] mt-2 text-sm">已下注：<b>' + esc(br ? br.name : '') + '「' + (b.type === 'win' ? '獨贏' : '位置') + '」' + fmt(b.amount) + ' 金</b>，賠率 ' + (b.type === 'win' ? b.winOdds : b.placeOdds)
       + '<button type="button" id="btn-cancel-bet" class="paper-btn text-xs px-2 py-1 ml-2">取消退回</button></div>';
   }
   if (!eligible.length) {
-    html += '<p class="text-xs text-[#5c5346] mt-2">目前沒有可報名的比賽，先去育成。</p>';
+    html += '<p class="text-xs text-[#5c5346] mt-2">沒有可報名的比賽，先去育成。</p>';
   } else {
     html += '<div class="grid grid-cols-3 gap-2 mt-2">'
       + '<select id="bet-race" class="card p-2 text-sm font-bold w-full">' + eligible.map(r => '<option value="' + r.id + '"' + (r.id === selRaceId ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') + '</select>'
       + '<select id="bet-type" class="card p-2 text-sm font-bold w-full"><option value="win">獨贏（冠軍）</option><option value="place">位置（前三）</option></select>'
       + '<select id="bet-amount" class="card p-2 text-sm font-bold w-full">' + BET_AMOUNTS.map(a => '<option value="' + a + '">' + fmt(a) + ' 金</option>').join('') + '</select>'
       + '</div>'
-      + (odds ? '<p class="text-xs text-[#5c5346] mt-2">目前賠率：獨贏 <b>' + odds.win + '</b>・位置 <b>' + odds.place + '</b>（依主力馬與對手實力估算，每次看略有浮動）</p>' : '')
+      + (odds ? '<p class="text-xs text-[#5c5346] mt-2">賠率：獨贏 <b>' + odds.win + '</b>・位置 <b>' + odds.place + '</b></p>' : '')
       + '<button type="button" id="btn-bet" class="gold-btn text-sm px-4 py-2.5 mt-2 w-full">下注</button>';
   }
   if (!specField) specField = genSpectateField(RACES[0]);
@@ -1393,7 +1405,7 @@ function renderBetPanel() {
     + '<select id="spec-type" class="card p-2 text-sm font-bold w-full"><option value="win">獨贏（冠軍）</option><option value="place">位置（前三）</option></select>'
     + '<select id="spec-amount" class="card p-2 text-sm font-bold w-full">' + BET_AMOUNTS.map(a => '<option value="' + a + '">' + fmt(a) + ' 金</option>').join('') + '</select>'
     + '</div>'
-    + '<p class="text-xs text-[#5c5346] mt-2">賠率寫在馬名前面；獨贏要押的馬拿冠軍，位置前三名就中。下注觀賽會用掉當週行動。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-2">獨贏＝押冠軍，位置＝押前三；會用掉當週行動。</p>'
     + '<button type="button" id="btn-spec-bet" class="gold-btn text-sm px-4 py-2.5 mt-2 w-full">下注並觀賽</button>';
   panel.innerHTML = html;
   const sb = $('btn-spec-bet');
@@ -1419,11 +1431,11 @@ function renderRace() {
   const h = activeHorse();
   $('race-list').innerHTML = RACES.map(race => {
     const err = raceEligible(h, race);
-    return '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white">'
-      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + esc(race.name) + '</span><span class="text-xs font-black text-[#d9941a]">獎金 ' + fmt(race.prize) + '</span></div>'
-      + '<div class="text-xs text-[#5c5346] mt-1">' + race.dist + 'm・' + race.turf + '地・' + race.distType + '距離・需 ' + race.minAge + ' 歲・' + race.minWins + ' 勝以上</div>'
-      + '<button type="button" data-race="' + race.id + '" class="gold-btn text-sm px-4 py-2 mt-2 w-full"' + (err ? ' disabled style="opacity:.45"' : '') + '>'
-      + (err ? esc(err) : '報名出賽（體力 -25）') + '</button></div>';
+    return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white flex items-center gap-2">'
+      + '<div class="flex-1 min-w-0"><div class="flex items-center gap-2"><span class="font-black text-sm">' + esc(race.name) + '</span><span class="text-xs font-black text-[#d9941a]">獎金 ' + fmt(race.prize) + '</span></div>'
+      + '<div class="text-[11px] text-[#5c5346] mt-0.5">' + race.dist + 'm・' + race.turf + '地・' + race.distType + '・' + race.minAge + '歲・' + race.minWins + '勝・體力-25</div></div>'
+      + '<button type="button" data-race="' + race.id + '" class="gold-btn text-xs px-3 py-2 shrink-0"' + (err ? ' disabled style="opacity:.45"' : '') + '>'
+      + (err ? esc(err) : '報名') + '</button></div>';
   }).join('');
   document.querySelectorAll('[data-race]').forEach(btn => {
     btn.addEventListener('click', () => runRace(btn.getAttribute('data-race')));
@@ -1544,7 +1556,8 @@ function renderGachaPanel() {
   const panel = $('gacha-panel');
   const pityLeft = 10 - (state.gachaPity || 0);
   let html = '<h2 class="font-black text-base">🎰 抽卡 <span class="text-xs font-bold text-[#5c5346]">馬 50%・裝備 30%・騎師 20%</span></h2>'
-    + '<p class="text-xs text-[#5c5346] mt-1">馬：普通 43%／良血 30%／名門 18%／傳奇 7%／神話 2%；裝備：粗製 55%／精良 25%／名匠 15%／傳奇 5%；騎師：見習 50%／普通 30%／精英 15%／王牌 5%。高稀有（名門馬／神話馬／名匠裝備／精英騎師以上）每 10 抽必出 1 個，現在保底還差 <b>' + pityLeft + '</b> 抽。馬房滿了時多抽到的馬會自動放生，領一筆小額放生金（普通 1,000／良血 2,000／名門 5,000／傳奇 10,000／神話 20,000）。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-1">每 10 抽必出高稀有，保底還差 <b>' + pityLeft + '</b> 抽；馬房滿了多抽的馬自動放生領小額金。</p>'
+    + '<details class="text-xs text-[#5c5346] mt-1"><summary>詳細機率</summary><p class="mt-1">馬：普通 43%／良血 30%／名門 18%／傳奇 7%／神話 2%；裝備：粗製 55%／精良 25%／名匠 15%／傳奇 5%；騎師：見習 50%／普通 30%／精英 15%／王牌 5%。放生金：普通 1,000／良血 2,000／名門 5,000／傳奇 10,000／神話 20,000。</p></details>'
     + '<div class="grid grid-cols-2 gap-2 mt-2">'
     + '<button type="button" id="btn-gacha-1" class="gold-btn text-sm px-4 py-2.5">單抽' + (state.gachaFreeUsed ? '・10,000 金' : '・首次免費') + '</button>'
     + '<button type="button" id="btn-gacha-10" class="gold-btn text-sm px-4 py-2.5">十連抽・90,000 金</button>'
@@ -1594,7 +1607,6 @@ function renderHall() {
   $('farm-stats').innerHTML =
     '<div>出賽 <b>' + state.totalRaces + '</b> 場・勝利 <b>' + state.totalWins + '</b> 場・累積獎金 <b>' + fmt(state.totalEarnings) + '</b></div>'
     + '<div>現役馬 <b>' + state.horses.filter(h => !h.retired).length + '</b> 匹・引退馬 <b>' + state.horses.filter(h => h.retired).length + '</b> 匹</div>'
-    + '<div>存檔在本機瀏覽器（天駒養成錄 v1）。</div>'
     + '<button type="button" id="btn-reset" class="paper-btn text-xs px-3 py-2 mt-2">重新開始</button>';
   $('btn-reset').addEventListener('click', resetGame);
 }
