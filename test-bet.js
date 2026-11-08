@@ -296,4 +296,15 @@ t('B27 比賽動畫修正保留', html.includes('void tok.offsetWidth'));
 t('B27 救濟與打工在', html.includes('破產救濟金') && html.includes('打工'));
 t('B28 賽況文字', T.raceCommentAt(0, 'A') === '閘門開了！各馬衝出起跑線！' && T.raceCommentAt(0.65, 'A').includes('彎道') && T.raceCommentAt(0.8, 'A').includes('最後直線'));
 
+// --- B29 結算後比賽面板收起來，不跟結果並存 ---
+freshState();
+mockRandom(0.5);
+T.genDayRaces();
+unmock();
+const race29 = T.state.races[0];
+T.$('race-live').classList.remove('hidden');
+T.finishRace(race29, fakeOutcome(race29));
+t('B29 結算後比賽面板隱藏', T.$('race-live').classList.contains('hidden') === true);
+t('B29 結算後結果面板顯示', T.$('race-result').classList.contains('hidden') === false);
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

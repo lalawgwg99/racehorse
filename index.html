@@ -482,6 +482,7 @@ function finishRace(race, outcome) {
   }
   const isLast = state.raceIdx >= 5;
   const res = $('race-result');
+  $('race-live').classList.add('hidden');
   res.classList.remove('hidden');
   res.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・結果</h2>'
     + '<div class="text-center py-3"><div class="text-3xl font-black">🥇 ' + esc(HORSE_MAP[ranks[0]].name) + '</div>'
