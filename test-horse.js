@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,coatImg,coatLabel,groupEquip,equipIcon,COATS,COAT_KEYS,renderEquipPanel,renderStable,$,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -601,6 +601,75 @@ T.state.money = 100;
 t('T38 金不夠不能擴建', T.expandStable() === false && T.stableCap() === 10, T.stableCap());
 T.state.stableCap = 20;
 t('T38 滿20格不能再擴', T.expandStable() === false, T.stableCap());
+
+// --- T39 六毛色 ---
+T.state = T.createDefaultState();
+t('T39 六種毛色', T.COAT_KEYS.length === 6 && T.COATS.bay.label === '栗毛' && T.COATS.mythic === undefined, T.COAT_KEYS.length);
+var h39 = T.newHorse({});
+t('T39 新馬有毛色', T.COAT_KEYS.includes(h39.coat), h39.coat);
+t('T39 coatImg路徑正確', T.coatImg(h39) === 'assets/coat-' + h39.coat + '.webp', T.coatImg(h39));
+t('T39 coatLabel正確', T.coatLabel({ coat: 'black' }) === '黑馬', T.coatLabel({ coat: 'black' }));
+t('T39 無毛色預設栗毛', T.coatImg({}) === 'assets/coat-bay.webp', T.coatImg({}));
+
+// --- T40 裝備疊放分組 ---
+T.state = T.createDefaultState();
+T.state.equipment = [
+  T.genEquipment('shoes', 'rough'), T.genEquipment('shoes', 'rough'), T.genEquipment('shoes', 'rough'),
+  T.genEquipment('shoes', 'fine'), T.genEquipment('saddle', 'legend'),
+];
+var groups = T.groupEquip(T.state.equipment);
+t('T40 3顆同款疊成1組', groups.length === 3, groups.length);
+var roughShoes = groups.find(g => g.slot === 'shoes' && g.tier === 'rough');
+t('T40 疊放數量×3', roughShoes && roughShoes.count === 3, roughShoes && roughShoes.count);
+t('T40 分組記第一件id', !!roughShoes && !!roughShoes.firstId, roughShoes && roughShoes.firstId);
+t('T40 equipIcon路徑', T.equipIcon('shoes') === 'assets/equip-horseshoe.webp', T.equipIcon('shoes'));
+
+// --- T41 舊存檔毛色遷移（同id同色、已有不覆蓋） ---
+T.state = T.createDefaultState();
+var oldH = { id: 'h-legacy-1', name: '老馬', sex: '公', age: 3, turf: '草地', dist: '短距離', stats: { spd: 50, sta: 50, pow: 50, gut: 50, wis: 50 }, rarity: 'good', wins: 0, races: 0, earnings: 0, retired: false };
+var keepH = { id: 'h-legacy-2', name: '留色馬', sex: '母', age: 3, turf: '草地', dist: '短距離', stats: { spd: 50, sta: 50, pow: 50, gut: 50, wis: 50 }, rarity: 'good', wins: 0, races: 0, earnings: 0, retired: false, coat: 'white' };
+T.state.horses = [oldH, keepH];
+T.migrateState();
+var c1 = oldH.coat;
+T.migrateState();
+t('T41 舊馬遷移補毛色且不亂跳', !!c1 && oldH.coat === c1, c1);
+t('T41 已有毛色不覆蓋', keepH.coat === 'white', keepH.coat);
+
+// --- T42 分組裝備照常裝上（用第一件id） ---
+T.state = T.createDefaultState();
+var h42 = T.newHorse({});
+h42.coat = 'bay';
+T.state.horses = [h42];
+T.state.activeHorseId = h42.id;
+var it42a = T.genEquipment('saddle', 'master');
+var it42b = T.genEquipment('saddle', 'master');
+T.state.equipment = [it42a, it42b];
+var g42 = T.groupEquip(T.state.equipment);
+T.equipItem(h42.id, g42[0].firstId);
+t('T42 分組第一件裝上', h42.equipment.saddle && h42.equipment.saddle.tier === 'master', h42.equipment.saddle && h42.equipment.saddle.tier);
+t('T42 背包剩1件', T.state.equipment.length === 1, T.state.equipment.length);
+
+// --- T43 裝備面板是圖示卡片不是文字膠囊 ---
+T.state = T.createDefaultState();
+var h43 = T.newHorse({});
+h43.coat = 'bay';
+T.state.horses = [h43];
+T.state.activeHorseId = h43.id;
+T.state.equipment = [T.genEquipment('shoes', 'rough'), T.genEquipment('shoes', 'rough'), T.genEquipment('shoes', 'rough'), T.genEquipment('saddle', 'legend')];
+T.renderEquipPanel(h43);
+var html43 = T.$('equip-panel').innerHTML;
+t('T43 面板有裝備圖示', html43.includes('assets/equip-horseshoe.webp') && html43.includes('assets/equip-saddle.webp'), html43.length);
+t('T43 重複疊放×3', html43.includes('×3'), html43.includes('×3'));
+t('T43 舊文字膠囊容器已消失', !html43.includes('flex flex-wrap gap-1.5') && html43.includes('grid grid-cols-4'), html43.includes('grid grid-cols-4'));
+
+// --- T44 馬房列表有毛色圖 ---
+T.state = T.createDefaultState();
+T.state.horses = [T.newHorse({}), T.newHorse({})];
+T.state.horses[0].coat = 'black';
+T.state.horses[1].coat = 'white';
+T.renderStable();
+var html44 = T.$('stable-list').innerHTML;
+t('T44 列表有毛色圖', html44.includes('assets/coat-black.webp') && html44.includes('assets/coat-white.webp'), html44.includes('assets/coat-'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

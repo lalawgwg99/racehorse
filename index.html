@@ -183,6 +183,29 @@ const RARITY = {
   legend: { label: '傳奇', cap: 99, color: '#d9941a', priceBase: 250000 },
   mythic: { label: '神話', cap: 110, color: '#8b5cf6', priceBase: 600000 },
 };
+const COATS = {
+  bay: { label: '栗毛', img: 'assets/coat-bay.webp' },
+  black: { label: '黑馬', img: 'assets/coat-black.webp' },
+  white: { label: '白馬', img: 'assets/coat-white.webp' },
+  chestnut: { label: '棗紅', img: 'assets/coat-chestnut.webp' },
+  gray: { label: '灰馬', img: 'assets/coat-gray.webp' },
+  palomino: { label: '金黃', img: 'assets/coat-palomino.webp' },
+};
+const COAT_KEYS = Object.keys(COATS);
+function coatImg(h) { const c = (h && h.coat && COATS[h.coat]) ? h.coat : 'bay'; return COATS[c].img; }
+function coatLabel(h) { const c = (h && h.coat && COATS[h.coat]) ? h.coat : 'bay'; return COATS[c].label; }
+function equipIcon(slot) {
+  return { saddle: 'assets/equip-saddle.webp', shoes: 'assets/equip-horseshoe.webp', bridle: 'assets/equip-bridle.webp', blinkers: 'assets/equip-blinkers.webp' }[slot] || 'assets/equip-saddle.webp';
+}
+function groupEquip(inv) {
+  const groups = [];
+  inv.forEach(it => {
+    const g = groups.find(x => x.slot === it.slot && x.tier === it.tier);
+    if (g) { g.count += 1; }
+    else { groups.push({ slot: it.slot, tier: it.tier, name: it.name, bonuses: it.bonuses, firstId: it.id, count: 1 }); }
+  });
+  return groups;
+}
 const RACES = [
   { id: 'maiden', name: '新馬戰', tier: '新馬', minWins: 0, minAge: 2, prize: 30000, dist: 1200, distType: '短', turf: '草', oppBase: 42 },
   { id: 'cond',   name: '條件戰', tier: '條件', minWins: 1, minAge: 2, prize: 50000, dist: 1600, distType: '中', turf: '草', oppBase: 60 },
@@ -339,6 +362,7 @@ function newHorse(opts) {
     age: opts.age || 2,
     sex: Math.random() < 0.5 ? '公' : '母',
     rarity: rarity,
+    coat: opts.coat || randPick(COAT_KEYS),
     stats: stats,
     energy: 100,
     mood: 2,
@@ -443,7 +467,7 @@ function migrateState() {
   if (!state.stableCap) state.stableCap = 6;
   (state.jockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   (state.shopJockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
-  state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); if (h.mythicwins === undefined) h.mythicwins = 0; });
+  state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); if (h.mythicwins === undefined) h.mythicwins = 0; if (!h.coat) { let s2 = 0; for (const ch of String(h.id)) s2 += ch.charCodeAt(0); h.coat = COAT_KEYS[s2 % COAT_KEYS.length]; } });
 }
 function createDefaultState() {
   const starter = newHorse({ rarity: 'good' });
@@ -715,7 +739,7 @@ function skipRace() {
   raceAnim.timers.forEach(t => { clearInterval(t); clearTimeout(t); });
   raceAnim.onFinish();
 }
-function startRaceAnimation(race, outcome, onFinish) {
+function startRaceAnimation(race, outcome, onFinish, horseImg) {
   raceAnim = { done: false, timers: [], onFinish: onFinish };
   const live = $('race-live');
   live.classList.remove('hidden');
@@ -740,7 +764,7 @@ function startRaceAnimation(race, outcome, onFinish) {
       + '<div class="text-center mt-2"><button type="button" id="btn-skip-race" class="paper-btn text-xs px-3 py-1.5">⏩ 跳過比賽</button></div>'
       + '<div class="race-scene mt-3"><div class="race-flag"></div>' + outcome.runners.map((r, i) =>
         '<div class="race-lane-row"><span class="lane-name">' + esc(r.name) + '</span>'
-        + '<div class="race-token' + (r.isPlayer ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + (r.isPlayer ? '<img src="assets/horse-bay.webp" alt="">' : '🐎') + '</div>'
+        + '<div class="race-token' + (r.isPlayer ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + (r.isPlayer ? '<img src="' + (horseImg || 'assets/coat-bay.webp') + '" alt="">' : '🐎') + '</div>'
         + '<span class="lane-pos" id="lane-pos-' + i + '">-</span></div>').join('') + '</div>'
       + '<div id="race-comment" class="text-sm font-bold text-[#1d4d2e] mt-2">閘門開了！各馬衝出起跑線！</div>';
     wireSkip();
@@ -794,7 +818,7 @@ function runRace(raceId) {
     state.money -= fee;
   }
   const outcome = calcRaceOutcome(h, race);
-  startRaceAnimation(race, outcome, () => { finishRace(h, race, outcome); racing = false; });
+  startRaceAnimation(race, outcome, () => { finishRace(h, race, outcome); racing = false; }, coatImg(h));
 }
 function applyRaceResult(h, race, outcome) {
   const rank = outcome.myRank;
@@ -1191,8 +1215,9 @@ function renderStable() {
   $('stable-list').innerHTML = state.horses.map(h => {
     const active = h.id === state.activeHorseId;
     return '<button type="button" data-horse="' + h.id + '" class="w-full text-left p-3 rounded-xl border-2 ' + (active ? 'border-[#d9941a] bg-[#fff8e6]' : 'border-[#e6dcc5] bg-white') + '">'
-      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + (active ? '⭐ ' : '') + esc(h.name) + (h.retired ? '（已引退）' : '') + '</span>' + rarityTag(h.rarity) + '</div>'
-      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・戰績 ' + h.wins + '勝/' + h.races + '戰・獎金 ' + fmt(h.earnings) + '</div>'
+      + '<div class="flex items-center gap-2.5"><img src="' + coatImg(h) + '" alt="" class="w-12 h-12 object-cover rounded-lg border border-[#d8cbb3] bg-[#f4ede0] shrink-0" onerror="this.style.display=\'none\'">'
+      + '<div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="font-black text-sm">' + (active ? '⭐ ' : '') + esc(h.name) + (h.retired ? '（已引退）' : '') + '</span>' + rarityTag(h.rarity) + '</div>'
+      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・' + coatLabel(h) + '・戰績 ' + h.wins + '勝/' + h.races + '戰・獎金 ' + fmt(h.earnings) + '</div></div></div>'
       + '</button>';
   }).join('');
   document.querySelectorAll('[data-horse]').forEach(btn => {
@@ -1207,7 +1232,7 @@ function renderStable() {
   if (!h) { detail.innerHTML = '<p class="text-sm text-[#5c5346]">馬房是空的，去商店買一匹馬吧。</p>'; return; }
   const cap = statCap(h);
   detail.innerHTML = '<div class="flex items-start gap-3">'
-    + '<img src="assets/horse-bay.webp" alt="賽馬" class="w-24 h-24 object-cover rounded-xl border border-[#d8cbb3] bg-[#f4ede0]" onerror="this.style.display=\'none\'">'
+    + '<img src="' + coatImg(h) + '" alt="賽馬" class="w-24 h-24 object-cover rounded-xl border border-[#d8cbb3] bg-[#f4ede0]" onerror="this.style.display=\'none\'">'
     + '<div class="flex-1"><div class="flex items-center gap-2 flex-wrap"><span class="font-black text-base">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
     + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離</div>'
     + (personaOf(h) ? '<div class="text-xs mt-1">🎭 ' + esc(h.persona) + '：' + esc(personaOf(h).desc) + '｜弱點：' + esc(personaOf(h).weakLabel) + (h.rival ? '｜宿敵：' + esc(h.rival) : '') + '</div>' : '')
@@ -1236,17 +1261,25 @@ function renderEquipPanel(h) {
   const slots = Object.keys(EQUIP_SLOTS).map(slot => {
     const eq = h.equipment[slot];
     const inv = state.equipment.filter(it => it.slot === slot);
+    const groups = groupEquip(inv);
+    const icon = equipIcon(slot);
     return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white mb-2">'
-      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + EQUIP_SLOTS[slot].label + '</span>'
-      + (eq ? '<span class="text-xs font-bold" style="color:' + EQUIP_TIERS[eq.tier].color + '">' + esc(eq.name) + '（' + equipBonusText(eq) + '）</span>'
+      + '<div class="flex items-center gap-2"><img src="' + icon + '" alt="" class="w-10 h-10 object-contain shrink-0" onerror="this.style.display=\'none\'">'
+      + '<span class="font-black text-sm">' + EQUIP_SLOTS[slot].label + '</span>'
+      + (eq ? '<span class="text-xs font-bold" style="color:' + EQUIP_TIERS[eq.tier].color + '">' + esc(eq.name) + '（' + equipBonusText(eq) + '）已裝備</span>'
         : '<span class="text-xs text-[#9a8f7a]">未裝備</span>') + '</div>'
       + (eq ? '<button type="button" data-unequip="' + slot + '" class="paper-btn text-xs px-2 py-1 mt-1.5">卸下</button>' : '')
-      + (inv.length ? '<div class="flex flex-wrap gap-1.5 mt-2">' + inv.map(it =>
-        '<button type="button" data-equip="' + it.id + '" class="paper-btn text-xs px-2 py-1">' + esc(it.name) + '（' + equipBonusText(it) + '）</button>').join('') + '</div>'
+      + (groups.length ? '<div class="grid grid-cols-4 gap-1.5 mt-2">' + groups.map(g =>
+        '<button type="button" data-equip="' + g.firstId + '" class="relative rounded-xl border-2 p-1.5 bg-[#fbf7ee] text-center" style="border-color:' + EQUIP_TIERS[g.tier].color + '">'
+        + '<img src="' + icon + '" alt="" class="w-full aspect-square object-contain" onerror="this.style.display=\'none\'">'
+        + '<div class="text-[11px] font-black leading-tight mt-0.5">' + esc(g.name) + '</div>'
+        + '<div class="text-[10px] text-[#5c5346]">' + equipBonusText(g) + '</div>'
+        + (g.count > 1 ? '<span class="absolute top-0.5 right-0.5 bg-[#9e2a22] text-white text-[10px] font-black rounded-full px-1.5 py-px">×' + g.count + '</span>' : '')
+        + '</button>').join('') + '</div>'
         : '<div class="text-[11px] text-[#9a8f7a] mt-1">背包沒有' + EQUIP_SLOTS[slot].label + '，贏比賽或去裝備市場看看</div>')
       + '</div>';
   }).join('');
-  panel.innerHTML = '<h2 class="font-black text-base">🎒 裝備 <span class="text-xs font-bold text-[#5c5346]">裝上後比賽戰力直接提升</span></h2><div class="mt-2">' + slots + '</div>';
+  panel.innerHTML = '<h2 class="font-black text-base">🎒 裝備 <span class="text-xs font-bold text-[#5c5346]">點圖示裝上，重複的疊成一疊</span></h2><div class="mt-2">' + slots + '</div>';
   document.querySelectorAll('[data-equip]').forEach(btn => {
     btn.addEventListener('click', () => equipItem(h.id, btn.getAttribute('data-equip')));
   });
@@ -1482,11 +1515,11 @@ function drawGacha(count) {
         const kept = Object.assign({}, it.horse);
         delete kept.price;
         state.horses.push(kept);
-        results.push({ kind: 'horse', name: kept.name, rarity: kept.rarity, kept: true });
+        results.push({ kind: 'horse', name: kept.name, rarity: kept.rarity, coat: kept.coat, kept: true });
       } else {
         const val = GACHA_RELEASE[it.horse.rarity] || 1000;
         state.money += val;
-        results.push({ kind: 'horse', name: it.horse.name, rarity: it.horse.rarity, kept: false, soldFor: val });
+        results.push({ kind: 'horse', name: it.horse.name, rarity: it.horse.rarity, coat: it.horse.coat, kept: false, soldFor: val });
       }
     } else if (it.kind === 'equip') {
       state.equipment.push(it.equip);
@@ -1519,7 +1552,7 @@ function renderGachaPanel() {
   if (lastGachaResults) {
     html += '<div class="mt-3 space-y-1.5">' + lastGachaResults.map(r => {
       const high = (r.kind === 'horse' && (r.rarity === 'noble' || r.rarity === 'legend' || r.rarity === 'mythic')) || (r.kind === 'equip' && (r.tier === 'master' || r.tier === 'legend')) || (r.kind === 'jockey' && (r.grade === 'elite' || r.grade === 'ace'));
-      const label = r.kind === 'horse' ? '🐴 ' + esc(r.name) + '（' + RARITY[r.rarity].label + '馬）' : (r.kind === 'equip' ? '🎒 ' + esc(r.name) : '🧢 ' + esc(r.name));
+      const label = r.kind === 'horse' ? '🐴 ' + esc(r.name) + '（' + RARITY[r.rarity].label + '・' + (COATS[r.coat] ? COATS[r.coat].label : '栗毛') + '）' : (r.kind === 'equip' ? '🎒 ' + esc(r.name) : '🧢 ' + esc(r.name));
       return '<div class="flex items-center justify-between text-xs p-2 rounded-lg ' + (high ? 'bg-[#fff8e6] border border-[#d9941a] font-black' : 'bg-white border border-[#e6dcc5]') + '"><span>' + label + '</span><span>' + (r.kept ? '✅ 已保留' : '🕊️ 放生 +' + fmt(r.soldFor) + ' 金') + '</span></div>';
     }).join('') + '</div>';
   }
@@ -1533,8 +1566,9 @@ function renderShop() {
   $('btn-refresh-shop').textContent = state.shopFreeRefresh ? '換一批（本週免費）' : '換一批（2,000 金）';
   $('shop-list').innerHTML = state.shop.map((h, i) => {
     return '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white">'
-      + '<div class="flex items-center justify-between"><span class="font-black text-sm">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
-      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離</div>'
+      + '<div class="flex items-center gap-2.5"><img src="' + coatImg(h) + '" alt="" class="w-12 h-12 object-cover rounded-lg border border-[#d8cbb3] bg-[#f4ede0] shrink-0" onerror="this.style.display=\'none\'">'
+      + '<div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="font-black text-sm">' + esc(h.name) + '</span>' + rarityTag(h.rarity) + '</div>'
+      + '<div class="text-xs text-[#5c5346] mt-1">' + h.age + '歲 ' + h.sex + '馬・' + h.turf + '地・' + h.dist + '距離・' + coatLabel(h) + '</div></div></div>'
       + '<div class="grid grid-cols-5 gap-1 mt-2 text-center text-[11px]">'
       + STAT_KEYS.map(k => '<div class="bg-[#f4ede0] rounded-lg py-1"><div class="font-bold">' + STAT_LABEL[k] + '</div><div class="font-black">' + h.stats[k] + '</div></div>').join('')
       + '</div>'
@@ -1546,8 +1580,8 @@ function renderShop() {
   const eq = $('equip-shop');
   eq.innerHTML = '<h2 class="font-black text-base">🎒 裝備市場 <span class="text-xs font-bold text-[#5c5346]">每週換兩件</span></h2>'
     + '<div class="space-y-2 mt-2">' + state.shopEquip.map((it, i) => {
-      return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white flex items-center justify-between"><div><span class="font-black text-sm" style="color:' + EQUIP_TIERS[it.tier].color + '">' + esc(it.name) + '</span><span class="text-xs text-[#5c5346]">　' + equipBonusText(it) + '</span></div>'
-        + '<button type="button" data-buy-equip="' + i + '" class="green-btn text-xs px-3 py-1.5">' + fmt(it.price) + ' 金</button></div>';
+      return '<div class="p-2.5 rounded-xl border border-[#e6dcc5] bg-white flex items-center gap-2"><img src="' + equipIcon(it.slot) + '" alt="" class="w-10 h-10 object-contain shrink-0" onerror="this.style.display=\'none\'"><div class="flex-1 min-w-0"><span class="font-black text-sm" style="color:' + EQUIP_TIERS[it.tier].color + '">' + esc(it.name) + '</span><span class="text-xs text-[#5c5346]">　' + equipBonusText(it) + '</span></div>'
+        + '<button type="button" data-buy-equip="' + i + '" class="green-btn text-xs px-3 py-1.5 whitespace-nowrap">' + fmt(it.price) + ' 金</button></div>';
     }).join('') + '</div>';
   document.querySelectorAll('[data-buy-equip]').forEach(btn => {
     btn.addEventListener('click', () => buyEquipment(Number(btn.getAttribute('data-buy-equip'))));
@@ -1555,7 +1589,7 @@ function renderShop() {
 }
 function renderHall() {
   $('hall-list').innerHTML = state.hall.length
-    ? state.hall.map(h => '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white"><span class="font-black text-sm">👑 ' + esc(h.name) + '</span><div class="text-xs text-[#5c5346] mt-1">G1 冠軍 ' + h.g1wins + ' 次・生涯 ' + h.wins + ' 勝・累積獎金 ' + fmt(h.earnings) + '</div></div>').join('')
+    ? state.hall.map(h => '<div class="p-3 rounded-xl border border-[#e6dcc5] bg-white flex items-center gap-2.5"><img src="' + coatImg(h) + '" alt="" class="w-10 h-10 object-cover rounded-lg border border-[#d8cbb3] bg-[#f4ede0] shrink-0" onerror="this.style.display=\'none\'"><div><span class="font-black text-sm">👑 ' + esc(h.name) + '</span><div class="text-xs text-[#5c5346] mt-1">G1 冠軍 ' + h.g1wins + ' 次・生涯 ' + h.wins + ' 勝・累積獎金 ' + fmt(h.earnings) + '</div></div></div>').join('')
     : '<p class="text-sm text-[#5c5346]">還沒有馬進名人堂。贏下一場 G1，名字就會刻在這裡。</p>';
   $('farm-stats').innerHTML =
     '<div>出賽 <b>' + state.totalRaces + '</b> 場・勝利 <b>' + state.totalWins + '</b> 場・累積獎金 <b>' + fmt(state.totalEarnings) + '</b></div>'
