@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
+eval(script + ';globalThis.__T={createDefaultState,newHorse,genShopHorse,genEquipment,genJockey,jockeyBonus,activeJockey,effStats,equipItem,unequipItem,buyEquipment,hireJockey,breed,previewOdds,setBet,cancelBet,migrateState,doTrain,doRest,doWalk,doFeed,calcPower,calcRaceOutcome,finishRace,raceEligible,advanceWeek,buyHorse,sellHorse,refreshShop,saveState,loadState,RACES,STAT_KEYS,EQUIP_TIERS,JOCKEY_GRADES,BREED_COST,MAX_STABLE,genSpectateField,finishSpectateRace,trainFailRate,sfx,setMuted,personaOf,weakPenalty,spendLegacy,lossTip,raceCommentAt,skipRace,genPersona,redeemCode,drawGacha,genGachaItem,gachaHigh,doWork,RARITY,horsePrice,autoRaceAll,applyRaceResult,expandStable,stableCap,expandCost,get state(){return state},set state(v){state=v},get specField(){return specField},set specField(v){specField=v}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -586,6 +586,21 @@ t('T37 滿房十連抽完錢變少', T.state.money < before37, T.state.money);
 T.drawGacha(10);
 t('T37 連抽兩次錢更少', T.state.money < before37 - 90000, T.state.money);
 unmock();
+
+// --- T38 擴建馬房 ---
+T.state = T.createDefaultState();
+t('T38 預設6格', T.stableCap() === 6, T.stableCap());
+t('T38 首次擴建費50000', T.expandCost() === 50000, T.expandCost());
+T.state.money = 1000000;
+t('T38 擴建成功', T.expandStable() === true && T.stableCap() === 8, T.stableCap());
+t('T38 擴建扣錢', T.state.money === 950000, T.state.money);
+t('T38 下次擴建費翻倍', T.expandCost() === 100000, T.expandCost());
+T.expandStable();
+t('T38 再擴到10格', T.stableCap() === 10, T.stableCap());
+T.state.money = 100;
+t('T38 金不夠不能擴建', T.expandStable() === false && T.stableCap() === 10, T.stableCap());
+T.state.stableCap = 20;
+t('T38 滿20格不能再擴', T.expandStable() === false, T.stableCap());
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -66,9 +66,10 @@
     <!-- 馬房 -->
     <section id="view-stable" class="space-y-3">
       <div class="card p-4">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
           <h2 class="font-black text-base">🏇 馬房</h2>
           <span id="stable-count" class="text-xs font-bold text-[#5c5346]"></span>
+          <button type="button" id="btn-expand-stable" class="gold-btn text-xs px-3 py-1.5 whitespace-nowrap"></button>
         </div>
         <div id="stable-list" class="space-y-2 mt-2"></div>
       </div>
@@ -153,6 +154,25 @@
 /* ================= 資料 ================= */
 const STORAGE_KEY = 'tianju_save_v1';
 const MAX_STABLE = 6;
+const STABLE_EXPAND_MAX = 20;
+function stableCap() { return (state && state.stableCap) || MAX_STABLE; }
+function expandCost() {
+  const n = (stableCap() - MAX_STABLE) / 2;
+  return 50000 * Math.pow(2, n);
+}
+function expandStable() {
+  if (stableCap() >= STABLE_EXPAND_MAX) { showToast('馬房已經擴建到上限（' + STABLE_EXPAND_MAX + ' 格）'); return false; }
+  const cost = expandCost();
+  if (state.money < cost) { showToast('金不夠，擴建要 ' + fmt(cost) + ' 金'); return false; }
+  state.money -= cost;
+  state.stableCap = stableCap() + 2;
+  addLog('🏗️ 擴建馬房：花 ' + fmt(cost) + ' 金，馬房變成 ' + state.stableCap + ' 格！');
+  showToast('馬房擴建到 ' + state.stableCap + ' 格！');
+  sfx('coin');
+  saveState();
+  renderAll();
+  return true;
+}
 const STAT_KEYS = ['spd', 'sta', 'pow', 'gut', 'wis'];
 const STAT_LABEL = { spd: '速度', sta: '耐力', pow: '力量', gut: '根性', wis: '智慧' };
 const MOOD_LABEL = ['極差', '不調', '普通', '好調', '絕好調'];
@@ -420,6 +440,7 @@ function migrateState() {
   if (state.gachaPity === undefined) state.gachaPity = 0;
   if (state.gachaFreeUsed === undefined) state.gachaFreeUsed = false;
   if (!state.redeemedCodes) state.redeemedCodes = [];
+  if (!state.stableCap) state.stableCap = 6;
   (state.jockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   (state.shopJockeys || []).forEach(j => { if (j.bond === undefined) j.bond = 0; });
   state.horses.forEach(h => { if (!h.equipment) h.equipment = {}; if (!h.persona) genPersona(h); if (h.mythicwins === undefined) h.mythicwins = 0; });
@@ -448,6 +469,7 @@ function createDefaultState() {
     gachaPity: 0,
     gachaFreeUsed: false,
     redeemedCodes: [],
+    stableCap: 6,
     jockeys: [rookie],
     activeJockeyId: rookie.id,
     totalRaces: 0,
@@ -891,8 +913,8 @@ function autoRaceAll() {
 function buyHorse(shopIdx) {
   const h = state.shop[shopIdx];
   if (!h) return;
-  if (state.horses.filter(x => !x.retired).length >= MAX_STABLE && state.horses.length >= MAX_STABLE) { showToast('馬房滿了（最多 ' + MAX_STABLE + ' 匹），先賣掉或引退一匹'); return; }
-  if (state.horses.length >= MAX_STABLE) { showToast('馬房滿了（最多 ' + MAX_STABLE + ' 匹）'); return; }
+  if (state.horses.filter(x => !x.retired).length >= stableCap() && state.horses.length >= stableCap()) { showToast('馬房滿了（' + stableCap() + ' 匹），去馬房擴建或賣掉一匹'); return; }
+  if (state.horses.length >= stableCap()) { showToast('馬房滿了（' + stableCap() + ' 匹），去馬房擴建或賣掉一匹'); return; }
   if (state.money < h.price) { showToast('金不夠，這匹要 ' + fmt(h.price) + ' 金'); return; }
   state.money -= h.price;
   const bought = Object.assign({}, h);
@@ -997,7 +1019,7 @@ function breed(sireId, damId) {
   if (sire.sex !== '公' || dam.sex !== '母') { showToast('配種需要一匹公馬＋一匹母馬'); return; }
   if (sireId === damId) { showToast('不能自己跟自己配'); return; }
   if (state.money < BREED_COST) { showToast('配種費要 ' + fmt(BREED_COST) + ' 金'); return; }
-  if (state.horses.length >= MAX_STABLE) { showToast('馬房滿了（最多 ' + MAX_STABLE + ' 匹）'); return; }
+  if (state.horses.length >= stableCap()) { showToast('馬房滿了（' + stableCap() + ' 匹），去馬房擴建或賣掉一匹'); return; }
   state.money -= BREED_COST;
   const foal = newHorse();
   foal.age = 2;
@@ -1159,10 +1181,13 @@ function rarityTag(rarity) {
 function renderHeader() {
   $('header-season').textContent = '第 ' + state.year + ' 年・第 ' + state.week + ' 週';
   $('header-money').textContent = '💰 ' + fmt(state.money);
-  $('header-horses').textContent = '馬房 ' + state.horses.length + '/' + MAX_STABLE;
+  $('header-horses').textContent = '馬房 ' + state.horses.length + '/' + stableCap();
 }
 function renderStable() {
   $('stable-count').textContent = '點一匹馬設為主力';
+  const expBtn = $('btn-expand-stable');
+  expBtn.textContent = stableCap() >= STABLE_EXPAND_MAX ? '已滿 ' + STABLE_EXPAND_MAX + ' 格' : '擴建 ＋2 格・' + fmt(expandCost());
+  expBtn.onclick = expandStable;
   $('stable-list').innerHTML = state.horses.map(h => {
     const active = h.id === state.activeHorseId;
     return '<button type="button" data-horse="' + h.id + '" class="w-full text-left p-3 rounded-xl border-2 ' + (active ? 'border-[#d9941a] bg-[#fff8e6]' : 'border-[#e6dcc5] bg-white') + '">'
@@ -1233,7 +1258,7 @@ function renderBreedPanel() {
   const panel = $('breed-panel');
   const males = state.horses.filter(h => h.sex === '公');
   const females = state.horses.filter(h => h.sex === '母');
-  const canBreed = males.length && females.length && state.horses.length < MAX_STABLE;
+  const canBreed = males.length && females.length && state.horses.length < stableCap();
   panel.innerHTML = '<h2 class="font-black text-base">🐴 繁殖配種 <span class="text-xs font-bold text-[#5c5346]">配種費 ' + fmt(BREED_COST) + ' 金</span></h2>'
     + '<p class="text-xs text-[#5c5346] mt-1">子嗣五圍取父母平均 ± 浮動，15% 機率突變 +5，稀有度取較高者、20% 機率升一階。出生即 2 歲，可直接育成。引退馬也可以配種。</p>'
     + '<div class="grid grid-cols-2 gap-2 mt-2">'
@@ -1241,7 +1266,7 @@ function renderBreedPanel() {
     + '<select id="breed-dam" class="card p-2 text-sm font-bold w-full">' + females.map(m => '<option value="' + m.id + '">' + esc(m.name) + '（' + RARITY[m.rarity].label + '）</option>').join('') + '</select>'
     + '</div>'
     + '<button type="button" id="btn-breed" class="gold-btn text-sm px-4 py-2.5 mt-2 w-full"' + (canBreed ? '' : ' disabled style="opacity:.45"') + '>'
-    + (canBreed ? '開始配種（' + fmt(BREED_COST) + ' 金）' : (state.horses.length >= MAX_STABLE ? '馬房滿了' : '需要一匹公馬＋一匹母馬')) + '</button>';
+    + (canBreed ? '開始配種（' + fmt(BREED_COST) + ' 金）' : (state.horses.length >= stableCap() ? '馬房滿了' : '需要一匹公馬＋一匹母馬')) + '</button>';
   const btn = $('btn-breed');
   if (btn) btn.addEventListener('click', () => breed($('breed-sire').value, $('breed-dam').value));
 }
@@ -1446,7 +1471,7 @@ function drawGacha(count) {
   const statSum = h => STAT_KEYS.reduce((a, k) => a + h.stats[k], 0);
   const drawnHorses = items.filter(it => it.kind === 'horse');
   drawnHorses.sort((a, b) => (horseRank[b.horse.rarity] - horseRank[a.horse.rarity]) || (statSum(b.horse) - statSum(a.horse)));
-  const freeSlots = Math.max(0, MAX_STABLE - state.horses.length);
+  const freeSlots = Math.max(0, stableCap() - state.horses.length);
   const keepSet = new Set(drawnHorses.slice(0, freeSlots));
   const results = [];
   let pity = state.gachaPity || 0;

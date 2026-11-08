@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天駒養成錄 — 視覺改版提案</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: #1d4d2e; color: #2b2118; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 16px 12px 40px; }
+  h1 { color: #f4ede0; font-size: 22px; margin: 4px 0 2px; }
+  .sub { color: #c9d6c2; font-size: 13px; margin: 0 0 16px; }
+  .card { background: #fbf7ee; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 17px; margin: 0 0 4px; }
+  .card p { font-size: 13px; line-height: 1.6; color: #5c5346; margin: 6px 0; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; color: #fff; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+  .cell { text-align: center; }
+  .cell img { width: 100%; border-radius: 12px; border: 2px solid #e6dcc5; display: block; }
+  .cell .nm { font-size: 12px; font-weight: 800; margin-top: 4px; }
+  .hero { width: 100%; border-radius: 12px; display: block; margin-top: 10px; }
+  .mock { background: #fff; border: 1px solid #e6dcc5; border-radius: 12px; padding: 10px; margin-top: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid #e6dcc5; border-radius: 10px; margin-bottom: 8px; background: #fff; }
+  .row img { width: 52px; height: 52px; object-fit: cover; border-radius: 10px; border: 2px solid #d9941a; }
+  .row .t { font-size: 14px; font-weight: 800; }
+  .row .s { font-size: 11px; color: #5c5346; margin-top: 2px; }
+  .eq { position: relative; border-radius: 12px; padding: 6px; text-align: center; background: #fff; }
+  .eq img { width: 100%; border-radius: 8px; display: block; }
+  .eq .t { font-size: 11px; font-weight: 800; margin-top: 4px; }
+  .eq .b { font-size: 10px; color: #5c5346; }
+  .eq .n { position: absolute; top: 2px; right: 2px; background: #9e2a22; color: #fff; font-size: 10px; font-weight: 800; border-radius: 999px; padding: 1px 6px; }
+  .t-rough { border: 2px solid #9a8f7a; } .t-fine { border: 2px solid #1d4ed8; }
+  .t-master { border: 2px solid #8b5cf6; } .t-legend { border: 2px solid #d9941a; }
+  table { width: 100%; font-size: 13px; border-collapse: collapse; margin-top: 8px; }
+  td, th { padding: 6px 4px; border-bottom: 1px solid #e6dcc5; text-align: left; }
+  th { color: #5c5346; font-size: 12px; }
+  .rec { background: #fff8e6; border: 2px solid #d9941a; }
+  .vs { display: flex; gap: 8px; margin-top: 10px; }
+  .vs div { flex: 1; font-size: 12px; line-height: 1.5; background: #fff; border: 1px solid #e6dcc5; border-radius: 10px; padding: 8px; }
+  .vs b { display: block; font-size: 13px; margin-bottom: 2px; }
+  .foot { color: #c9d6c2; font-size: 12px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐴 天駒養成錄 — 視覺改版提案</h1>
+  <p class="sub">針對你截圖的兩個痛點：馬匹圖片全都同一隻、裝備是幾十顆重複文字滑不到底。</p>
+
+  <div class="card">
+    <h2>問題在哪</h2>
+    <p>1）馬房 6 匹全是傳奇，但大頭貼全部同一張栗毛馬，分不出誰是誰。<br>
+    2）裝備一格一顆文字膠囊，粗製蹄鐵就重複 20 幾顆，滑很久才找得到要的。<br>
+    3）馬房上限 6 格，滿了就卡住（這項已經做好，見最下面）。</p>
+  </div>
+
+  <div class="card">
+    <h2>方案 A — 扁平插畫 <span class="tag" style="background:#1d6b41">現有風格延續</span></h2>
+    <p>跟現在同一套畫風，每匹馬出生隨機一種毛色，六種一眼分得出來。稀有度另外用框色區分：普通灰、良血綠、名門藍、傳奇金、神話紫。</p>
+    <div class="grid3">
+      <div class="cell"><img src="{{coat_bay}}"><div class="nm">栗毛</div></div>
+      <div class="cell"><img src="{{coat_black}}"><div class="nm">黑馬</div></div>
+      <div class="cell"><img src="{{coat_white}}"><div class="nm">白馬</div></div>
+      <div class="cell"><img src="{{coat_chestnut}}"><div class="nm">棗紅</div></div>
+      <div class="cell"><img src="{{coat_gray}}"><div class="nm">灰馬</div></div>
+      <div class="cell"><img src="{{coat_palomino}}"><div class="nm">金黃</div></div>
+    </div>
+    <p><b>改版後的馬房長這樣：</b></p>
+    <div class="mock">
+      <div class="row"><img src="{{coat_black}}"><div><div class="t">夜鷹公主 <span class="tag" style="background:#d9941a">傳奇</span></div><div class="s">2歲 母馬・泥地・中距離・4勝/4戰</div></div></div>
+      <div class="row"><img src="{{coat_white}}"><div><div class="t">紫電飛馳 <span class="tag" style="background:#d9941a">傳奇</span></div><div class="s">2歲 公馬・草地・短距離・2勝/4戰</div></div></div>
+      <div class="row"><img src="{{coat_palomino}}"><div><div class="t">金駒疾風 <span class="tag" style="background:#8b5cf6">神話</span></div><div class="s">3歲 公馬・草地・長距離・8勝/9戰</div></div></div>
+    </div>
+    <p><b>裝備改成圖示卡片：</b>一點就裝備，同一種疊成一疊顯示數量，不再 20 顆排到底。</p>
+    <div class="grid4">
+      <div class="eq t-master"><img src="{{flat_saddle}}"><div class="t">名匠馬鞍</div><div class="b">速度+4・耐力+3</div><span class="n">×2</span></div>
+      <div class="eq t-legend"><img src="{{flat_horseshoe}}"><div class="t">傳奇蹄鐵</div><div class="b">速度+5・力量+5</div></div>
+      <div class="eq t-rough"><img src="{{flat_bridle}}"><div class="t">粗製韁繩</div><div class="b">智慧+1・根性+1</div><span class="n">×12</span></div>
+      <div class="eq t-fine"><img src="{{flat_blinkers}}"><div class="t">精良眼罩</div><div class="b">根性+2・速度+2</div><span class="n">×3</span></div>
+    </div>
+    <div class="vs">
+      <div><b>✅ 優點</b>風格跟現在一致、檔案小載入快、六種毛色現成可用，改版最快上線。</div>
+      <div><b>⚠️ 缺點</b>精緻度上限就是扁平插畫，沒有寫實版那麼驚豔。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方案 B — 寫實立繪 <span class="tag" style="background:#8b5cf6">最有質感</span></h2>
+    <p>手機遊戲那種寫實立繪，深色底＋金框，馬跟裝備都像真的。六種毛色要重畫六張立繪，工比較大。</p>
+    <img class="hero" src="{{horse_realistic}}">
+    <p style="text-align:center;font-size:12px;">寫實版馬頭像示意（栗毛）</p>
+    <div class="grid4">
+      <div class="eq t-master"><img src="{{real_saddle}}"><div class="t">名匠馬鞍</div><div class="b">速度+4・耐力+3</div></div>
+      <div class="eq t-legend"><img src="{{real_horseshoe}}"><div class="t">傳奇蹄鐵</div><div class="b">速度+5・力量+5</div></div>
+      <div class="eq t-rough"><img src="{{real_bridle}}"><div class="t">粗製韁繩</div><div class="b">智慧+1・根性+1</div><span class="n">×12</span></div>
+      <div class="eq t-fine"><img src="{{real_blinkers}}"><div class="t">精良眼罩</div><div class="b">根性+2・速度+2</div></div>
+    </div>
+    <div class="vs">
+      <div><b>✅ 優點</b>質感最好，最像 iPhone 上的商業賽馬遊戲。</div>
+      <div><b>⚠️ 缺點</b>檔案大、載入慢一點；六色立繪＋四槽裝備要再畫一輪，上線比 A 慢。</div>
+    </div>
+  </div>
+
+  <div class="card rec">
+    <h2>我的建議</h2>
+    <p>先上 <b>A 方案</b>：圖都現成了，今晚就能改完上線，馬一眼分得出來、裝備一點就裝、重複的疊起來，滑動長度直接少掉八成。之後如果想要更驚豔，再把 B 的寫實立繪當作「神話馬專屬造型」慢慢換上去，等級感也有了。</p>
+    <p>也可以混搭：<b>扁平馬 ＋ 寫實裝備</b>，或是 <b>寫實馬 ＋ 扁平裝備</b>，回聊天室直接講一聲就行。</p>
+  </div>
+
+  <div class="card">
+    <h2>🏗️ 擴建馬房 <span class="tag" style="background:#1d6b41">已做好，v3.5 上線</span></h2>
+    <p>馬房卡片右上角多了「擴建」鈕，每次 ＋2 格，費用翻倍，上限 20 格。舊存檔沿用 6 格，不用重開。</p>
+    <table>
+      <tr><th>擴建次數</th><th>格數</th><th>費用</th></tr>
+      <tr><td>第 1 次</td><td>6 → 8</td><td>50,000</td></tr>
+      <tr><td>第 2 次</td><td>8 → 10</td><td>100,000</td></tr>
+      <tr><td>第 3 次</td><td>10 → 12</td><td>200,000</td></tr>
+      <tr><td>第 4 次</td><td>12 → 14</td><td>400,000</td></tr>
+      <tr><td>第 5 次</td><td>14 → 16</td><td>800,000</td></tr>
+      <tr><td>第 6 次</td><td>16 → 18</td><td>1,600,000</td></tr>
+      <tr><td>第 7 次</td><td>18 → 20</td><td>3,200,000</td></tr>
+    </table>
+    <p>買馬、配種、抽卡的滿格判斷全部跟著新上限走，滿了會提示去擴建。</p>
+  </div>
+
+  <p class="foot">看完回聊天室點一個方案，我就照那個動工。<br>Ａ 扁平插畫 ／ Ｂ 寫實立繪 ／ 混搭（講一聲要怎麼混）</p>
+</div>
+</body>
+</html>
