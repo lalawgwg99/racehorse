@@ -758,5 +758,10 @@ t('T50 列表不再重複戰績文字', !html50.includes('勝/'), html50.include
 t('T50 列表仍有毛色圖', html50.includes('assets/coat-black.webp') && html50.includes('assets/coat-white.webp'), html50.includes('assets/coat-'));
 t('T50 詳情仍在下方', T.$('horse-detail').innerHTML.includes('本週行動'), T.$('horse-detail').innerHTML.length);
 
+// --- T51 比賽棋子真的會跑（先排版再改位置，否則直接瞬移到終點） ---
+t('T51 棋子移動前強制排版', html.includes('void tok.offsetWidth'), html.includes('offsetWidth'));
+t('T51 棋子移動用雙重rAF', html.includes("requestAnimationFrame(() => { requestAnimationFrame(() => { tok.style.left = '92%'; }); })"), html.includes('92%'));
+t('T51 棋子有left過渡', html.includes("tok.style.transition = 'left '"), html.includes('transition'));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

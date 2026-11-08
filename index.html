@@ -779,7 +779,7 @@ function startRaceAnimation(race, outcome, onFinish, horseImg) {
     const startAt = Date.now();
     outcome.runners.forEach((r, i) => {
       const tok = $('lane-' + i);
-      if (tok) { tok.style.transition = 'left ' + durs[i] + 'ms linear'; requestAnimationFrame(() => { tok.style.left = '92%'; }); }
+      if (tok) { tok.style.transition = 'left ' + durs[i] + 'ms linear'; void tok.offsetWidth; requestAnimationFrame(() => { requestAnimationFrame(() => { tok.style.left = '92%'; }); }); }
     });
     const posTimer = setInterval(() => {
       const elapsed = Date.now() - startAt;
