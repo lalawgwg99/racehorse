@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,migrateState,migratedMoney,saveState,loadState,formBonus,horsePower,calcOdds,comboOdds,payoutFor,genDayRaces,currentRace,todayStats,setBetType,setBetAmount,betAllIn,setCustomAmount,togglePick,betOddsFor,placeBet,doWork,checkRelief,finishRace,nextRace,nextDay,showDaySummary,raceCommentAt,renderHeader,renderSchedule,renderBetSheet,renderRecords,renderAll,switchView,effFor,rollEvent,buildOutcome,eventText,eventReveal,rollWeather,ownerRaceIdx,vipBonus,buyVip,buyNaming,buyTrophy,ownerPrice,buyHorse,startGallop,stopGallop,cheer,speedStat,staminaStat,kickStat,DIST_WEIGHTS,distHintText,HORSES,HORSE_MAP,RACE_SCHEDULE,BET_TYPES,BET_CHIPS,WEATHERS,VIP_TIERS,TROPHIES,NAMING_PRICE,NAMING_DAYS,OWNER_WIN_BONUS,OWNER_G1_BONUS,OWNER_PLACE_BONUS,COATS,SAVE_KEY,OLD_SAVE_KEY,$,get state(){return state},set state(v){state=v},get betDraft(){return betDraft},set betDraft(v){betDraft=v},get racing(){return racing},set racing(v){racing=v},get gallopTimer(){return gallopTimer}};');
+eval(script + ';globalThis.__T={createDefaultState,migrateState,migratedMoney,saveState,loadState,formBonus,horsePower,calcOdds,comboOdds,payoutFor,genDayRaces,currentRace,todayStats,setBetType,setBetAmount,betAllIn,setCustomAmount,togglePick,betOddsFor,placeBet,doWork,checkRelief,finishRace,nextRace,nextDay,showDaySummary,raceCommentAt,renderHeader,renderSchedule,renderBetSheet,renderRecords,renderAll,switchView,effFor,rollEvent,buildOutcome,eventText,eventReveal,rollWeather,ownerRaceIdx,vipBonus,buyVip,buyNaming,buyTrophy,ownerPrice,buyHorse,startGallop,stopGallop,cheer,speedStat,staminaStat,kickStat,DIST_WEIGHTS,distHintText,ovalPos,ovalSvg,HORSES,HORSE_MAP,RACE_SCHEDULE,BET_TYPES,BET_CHIPS,WEATHERS,VIP_TIERS,TROPHIES,NAMING_PRICE,NAMING_DAYS,OWNER_WIN_BONUS,OWNER_G1_BONUS,OWNER_PLACE_BONUS,COATS,SAVE_KEY,OLD_SAVE_KEY,$,get state(){return state},set state(v){state=v},get betDraft(){return betDraft},set betDraft(v){betDraft=v},get racing(){return racing},set racing(v){racing=v},get gallopTimer(){return gallopTimer}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -297,7 +297,7 @@ t('B26 切回賽程頁', T.$('view-race').classList.contains('hidden') === false
 // --- B27-B28 原始碼檢查 ---
 t('B27 標題是天駒賽馬', html.includes('天駒賽馬') && html.includes('<title>天駒賽馬｜下注競猜</title>'));
 t('B27 舊育成系統已移除', !html.includes('育成') && !html.includes('配種') && !html.includes('抽卡') && !html.includes('馬房'));
-t('B27 比賽動畫修正保留', html.includes('void tok.offsetWidth'));
+t('B27 橢圓動畫用 CSS 過渡', html.includes('transition: left .2s linear, top .2s linear') && html.includes('placeToken'));
 t('B27 救濟與打工在', html.includes('破產救濟金') && html.includes('打工'));
 t('B28 賽況文字', T.raceCommentAt(0, 'A') === '閘門開了！各馬衝出起跑線！' && T.raceCommentAt(0.65, 'A').includes('彎道') && T.raceCommentAt(0.8, 'A').includes('最後直線'));
 
@@ -529,5 +529,27 @@ t('B45 下注頁有距離提示', bs45.includes('最重要') || bs45.includes('�
 T.renderRecords();
 const cg45 = T.$('collection-grid').innerHTML;
 t('B45 圖鑑有三數值', cg45.includes('速') && cg45.includes('耐') && cg45.includes('爆'));
+
+// --- B46 橢圓幾何：逆時針跑一圈 ---
+const o0 = T.ovalPos(0, 0);
+const o25 = T.ovalPos(0.25, 0);
+const o50 = T.ovalPos(0.5, 0);
+const o1 = T.ovalPos(1, 0);
+t('B46 起點在底部中央', Math.abs(o0.x - 50) < 0.01 && o0.y > 90, o0.x.toFixed(1) + ',' + o0.y.toFixed(1));
+t('B46 四分之一圈在最右', o25.x > 90 && Math.abs(o25.y - 53.57) < 0.5, o25.x.toFixed(1) + ',' + o25.y.toFixed(1));
+t('B46 半圈在頂部中央', Math.abs(o50.x - 50) < 0.01 && o50.y < 16, o50.x.toFixed(1) + ',' + o50.y.toFixed(1));
+t('B46 一圈回到起點', Math.abs(o1.x - o0.x) < 0.01 && Math.abs(o1.y - o0.y) < 0.01, o1.x.toFixed(1) + ',' + o1.y.toFixed(1));
+t('B46 前直道大、後直道小', o0.scale > o50.scale && Math.abs(o0.scale - 1.25) < 0.01 && Math.abs(o50.scale - 0.75) < 0.01, o0.scale.toFixed(2) + ' vs ' + o50.scale.toFixed(2));
+t('B46 內側賽道半徑小', T.ovalPos(0, 7).y < T.ovalPos(0, 0).y, T.ovalPos(0, 7).y.toFixed(1) + ' vs ' + o0.y.toFixed(1));
+
+// --- B47 橢圓 SVG 結構 ---
+const svg47 = T.ovalSvg();
+t('B47 SVG 有橢圓賽道', svg47.includes('<svg') && svg47.includes('<ellipse'));
+t('B47 SVG 有終點格紋', svg47.includes('#1e1a16'));
+t('B47 SVG 有看台內場', svg47.includes('stroke="#d9941a"') && svg47.includes('fill="#2e7d4f"'));
+
+// --- B48 直線賽道已移除 ---
+t('B48 無直線賽道殘留', !html.includes('race-lane-row') && !html.includes('race-track.webp') && !html.includes('race-flag'));
+t('B48 有橢圓賽道', html.includes('oval-scene') && html.includes('ovalPos') && html.includes('ovalSvg'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

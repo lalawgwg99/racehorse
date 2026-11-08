@@ -18,22 +18,18 @@
   .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .7rem 0 calc(.8rem + env(safe-area-inset-bottom)); min-height: 64px; font-size: 13px; font-weight: 800; color: #b8a686; text-align: center; }
   .nav-btn.active { color: #f6c453; }
   .nav-ico { font-size: 24px; line-height: 1; }
-  .race-scene { position: relative; border-radius: 1rem; overflow: hidden; background-image: url('assets/race-track.webp'); background-size: cover; background-position: center 72%; border: 1px solid #d8cbb3; }
-  .race-lane-row { position: relative; height: 2.6rem; border-bottom: 1px dashed rgba(255,255,255,.55); }
-  .race-lane-row:last-child { border-bottom: none; }
-  .race-token { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 2.3rem; height: 2.3rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: #fdfbf3; overflow: hidden; padding: 0; }
-  .race-token.me { width: 2.6rem; height: 2.6rem; border-color: #d9941a; }
-  .race-token img { width: 100%; height: 100%; object-fit: cover; }
-  .race-token.bob { animation: bob .45s ease-in-out infinite alternate; }
-  @keyframes bob { from { margin-top: 0; } to { margin-top: -3px; } }
-  .race-flag { position: absolute; right: 2px; top: 0; bottom: 0; width: 3px; background: repeating-linear-gradient(180deg, #1e1a16 0 8px, #fff 8px 16px); z-index: 3; }
-  .lane-name { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 800; background: rgba(255,255,255,.88); border-radius: 999px; padding: 1px 6px; z-index: 2; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lane-pos { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.7); z-index: 2; }
+  .oval-scene { position: relative; width: 100%; aspect-ratio: 400/280; border-radius: 1rem; overflow: hidden; border: 1px solid #d8cbb3; }
+  .oval-scene svg { display: block; width: 100%; height: 100%; }
+  .oval-token { position: absolute; width: 34px; height: 34px; transform: translate(-50%, -50%); transition: left .2s linear, top .2s linear; z-index: 5; }
+  .oval-token img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); background: #f4ede0; display: block; }
+  .oval-token.me img { border-color: #d9941a; border-width: 3px; }
+  .oval-token.fallen img { border-color: #9e2a22; filter: grayscale(.7); }
+  .oval-token.awake img { border-color: #f6c453; box-shadow: 0 0 10px #f6c453; }
+  .oval-rank { position: absolute; top: -9px; right: -9px; min-width: 18px; height: 18px; border-radius: 999px; background: #1d4d2e; color: #fff; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; padding: 0 3px; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .oval-rank.me { background: #d9941a; }
   .fade-in { animation: fadeIn .25s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .chip { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
-  .race-token.fallen { border-color: #9e2a22; filter: grayscale(.7); }
-  .race-token.awake { border-color: #f6c453; box-shadow: 0 0 10px #f6c453; }
 </style>
 </head>
 <body class="turf-bg min-h-screen text-[#1e1a16]">
@@ -579,6 +575,39 @@ function raceCommentAt(prog, leaderName) {
   if (prog >= 0.3) return '中段，各馬展開爭奪！';
   return '閘門開了！各馬衝出起跑線！';
 }
+const OVAL_W = 400, OVAL_H = 280, OVAL_CX = 200, OVAL_CY = 150, OVAL_RX = 175, OVAL_RY = 108, OVAL_GAP = 8;
+function ovalPos(prog, lane) {
+  const rx = OVAL_RX - lane * OVAL_GAP;
+  const ry = OVAL_RY - lane * OVAL_GAP;
+  const a = Math.PI / 2 - clamp(prog, 0, 1) * Math.PI * 2;
+  const x = (OVAL_CX + rx * Math.cos(a)) / OVAL_W * 100;
+  const y = (OVAL_CY + ry * Math.sin(a)) / OVAL_H * 100;
+  const yTop = (OVAL_CY - OVAL_RY) / OVAL_H * 100;
+  const yBottom = (OVAL_CY + OVAL_RY) / OVAL_H * 100;
+  const scale = 0.75 + 0.5 * (y - yTop) / (yBottom - yTop);
+  return { x: x, y: y, scale: scale };
+}
+function ovalSvg() {
+  const laneLines = [167, 159, 151, 143, 135, 127, 119].map(rx => {
+    const ry = Math.round(rx * OVAL_RY / OVAL_RX);
+    return '<ellipse cx="200" cy="150" rx="' + rx + '" ry="' + ry + '" fill="none" stroke="#fff8e6" stroke-width="1" opacity="0.7"/>';
+  }).join('');
+  let checks = '';
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 2; c++) {
+    checks += '<rect x="' + (193 + c * 7) + '" y="' + (199 + r * 10) + '" width="7" height="10" fill="' + ((r + c) % 2 === 0 ? '#1e1a16' : '#fff') + '"/>';
+  }
+  return '<svg viewBox="0 0 400 280" preserveAspectRatio="xMidYMid meet">'
+    + '<rect width="400" height="280" fill="#f4ede0"/>'
+    + '<ellipse cx="200" cy="150" rx="185" ry="115" fill="#1d6b41"/>'
+    + '<ellipse cx="200" cy="150" rx="175" ry="108" fill="#e8c88a"/>'
+    + laneLines
+    + '<ellipse cx="200" cy="150" rx="112" ry="50" fill="#2e7d4f"/>'
+    + '<circle cx="160" cy="140" r="10" fill="#1d4d2e"/><circle cx="200" cy="168" r="8" fill="#1d4d2e"/><circle cx="242" cy="138" r="9" fill="#1d4d2e"/>'
+    + '<rect x="150" y="6" width="100" height="20" rx="4" fill="#f4ede0" stroke="#d9941a" stroke-width="2"/>'
+    + '<circle cx="165" cy="16" r="3" fill="#d9941a"/><circle cx="180" cy="16" r="3" fill="#1d6b41"/><circle cx="195" cy="16" r="3" fill="#9e2a22"/><circle cx="210" cy="16" r="3" fill="#d9941a"/><circle cx="225" cy="16" r="3" fill="#1d6b41"/>'
+    + checks
+    + '</svg>';
+}
 function skipRace() {
   if (!raceAnim || raceAnim.done) return;
   stopGallop();
@@ -609,10 +638,11 @@ function startRaceAnimation(race, outcome, onFinish) {
   function runScene() {
     live.innerHTML = '<h2 class="font-black text-base">' + esc(race.name) + '・' + race.dist + 'm ' + race.turf + '地 ' + (WEATHERS[race.weather] || WEATHERS.sunny).icon + '進行中…</h2>'
       + '<div class="text-center mt-2"><button type="button" id="btn-skip-race" class="paper-btn text-xs px-3 py-1.5">⏩ 跳過比賽</button></div>'
-      + '<div class="race-scene mt-3"><div class="race-flag"></div>' + outcome.runners.map((r, i) =>
-        '<div class="race-lane-row"><span class="lane-name">' + esc(r.name) + '</span>'
-        + '<div class="race-token' + (r.isPicked ? ' me bob' : ' bob') + '" id="lane-' + i + '" style="left:6%">' + '<img src="' + COATS[r.coat].img + '" alt="">' + '</div>'
-        + '<span class="lane-pos" id="lane-pos-' + i + '">-</span></div>').join('') + '</div>'
+      + '<div class="oval-scene mt-3">' + ovalSvg() + outcome.runners.map((r, i) => {
+        const p0 = ovalPos(0, i);
+        return '<div class="oval-token' + (r.isPicked ? ' me' : '') + '" id="lane-' + i + '" style="left:' + p0.x.toFixed(2) + '%;top:' + p0.y.toFixed(2) + '%"><img src="' + COATS[r.coat].img + '" alt=""><span class="oval-rank' + (r.isPicked ? ' me' : '') + '" id="lane-pos-' + i + '">-</span></div>';
+      }).join('') + '</div>'
+      + '<div id="race-standings" class="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-2 text-xs"></div>'
       + '<div id="race-comment" class="text-sm font-bold text-[#1d4d2e] mt-2">閘門開了！各馬衝出起跑線！</div>';
     wireSkip();
     sfx('gate'); startGallop();
@@ -622,35 +652,45 @@ function startRaceAnimation(race, outcome, onFinish) {
     const effDurs = outcome.runners.map((r, i) => r.event === 'fall' ? durs[i] * 0.45 : durs[i]);
     const maxDur = 5200 * (maxEff / minEff);
     const startAt = Date.now();
-    outcome.runners.forEach((r, i) => {
+    const placeToken = (i, prog) => {
       const tok = $('lane-' + i);
-      if (tok) {
-        const fall = r.event === 'fall';
-        tok.style.transition = 'left ' + effDurs[i] + 'ms linear';
-        void tok.offsetWidth;
-        requestAnimationFrame(() => { requestAnimationFrame(() => { tok.style.left = fall ? '42%' : '92%'; }); });
-      }
-    });
+      if (!tok) return;
+      const p = ovalPos(prog, i);
+      tok.style.left = p.x.toFixed(2) + '%';
+      tok.style.top = p.y.toFixed(2) + '%';
+      tok.style.transform = 'translate(-50%,-50%) scale(' + p.scale.toFixed(2) + ')';
+      tok.style.zIndex = Math.round(p.y * 10);
+    };
     const posTimer = setInterval(() => {
       const elapsed = Date.now() - startAt;
       const prog = effDurs.map(d => clamp(elapsed / d, 0, 1));
       const overall = clamp(elapsed / Math.min(7000, maxDur), 0, 1);
-      const leaderIdx = prog.map((p, j) => ({ j: j, p: p })).sort((a, b) => b.p - a.p)[0].j;
+      const order = prog.map((p, j) => ({ j: j, p: p })).sort((a, b) => b.p - a.p);
+      const leaderIdx = order[0].j;
       const comment = $('race-comment');
       if (comment) {
         const evText = eventReveal(outcome, overall);
         comment.textContent = evText || raceCommentAt(overall, outcome.runners[leaderIdx].name);
       }
+      const st = $('race-standings');
+      if (st) {
+        st.innerHTML = order.map((o, rank) => {
+          const r = outcome.runners[o.j];
+          const tag = (r.event === 'fall' && overall >= 0.45) ? ' 💥摔馬' : (r.event === 'awaken' && overall >= 0.5) ? ' ⚡覺醒' : (r.event === 'kick' && overall >= 0.6) ? ' 🔥末腳' : '';
+          const rankTxt = overall >= 0.75 ? '？' : '第' + (rank + 1) + '名';
+          return '<div class="' + (r.isPicked ? 'font-black text-[#d9941a]' : '') + '">' + rankTxt + ' ' + esc(r.name) + tag + '</div>';
+        }).join('');
+      }
       outcome.runners.forEach((r, i) => {
+        placeToken(i, prog[i]);
         const tok = $('lane-' + i);
         if (tok && r.event === 'awaken' && overall >= 0.5 && !tok.classList.contains('awake')) { tok.classList.add('awake'); sfx('awaken'); }
         if (tok && r.event === 'fall' && overall >= 0.45 && !tok.classList.contains('fallen')) { tok.classList.add('fallen'); sfx('fall'); }
         const pos = $('lane-pos-' + i);
         if (!pos) return;
-        if (r.event === 'fall' && overall >= 0.45) { pos.textContent = '💥摔馬'; return; }
+        if (r.event === 'fall' && overall >= 0.45) { pos.textContent = '💥'; return; }
         if (overall >= 0.75) { pos.textContent = '？'; return; }
-        const cur = prog.map((p, j) => ({ j: j, p: p })).sort((a, b) => b.p - a.p).findIndex(x => x.j === i) + 1;
-        pos.textContent = '第' + cur + '名';
+        pos.textContent = order.findIndex(x => x.j === i) + 1;
       });
     }, 200);
     raceAnim.timers.push(posTimer);
