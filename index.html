@@ -218,7 +218,18 @@ const HORSES = [
 const HORSE_MAP = {};
 HORSES.forEach(h => { HORSE_MAP[h.id] = h; });
 function basePower(h) { return h.spd * 0.35 + h.sta * 0.25 + h.pow * 0.15 + h.gut * 0.15 + h.wis * 0.10; }
-const SORTED_HORSES = HORSES.slice().sort((a, b) => basePower(b) - basePower(a));
+function speedStat(h) { return Math.round(h.spd * 0.8 + h.wis * 0.2); }
+function staminaStat(h) { return Math.round(h.sta * 0.8 + h.gut * 0.2); }
+function kickStat(h) { return Math.round(h.pow * 0.4 + h.gut * 0.3 + h.wis * 0.3); }
+const DIST_WEIGHTS = {
+  '短': { spd: 0.5, sta: 0.2, kick: 0.3, key: '速度', hint: '速度最重要' },
+  '中': { spd: 0.35, sta: 0.35, kick: 0.3, key: '速度與耐力', hint: '速度與耐力並重' },
+  '長': { spd: 0.25, sta: 0.5, kick: 0.25, key: '耐力', hint: '耐力最重要' },
+};
+function distHintText(distType) {
+  const w = DIST_WEIGHTS[distType] || DIST_WEIGHTS['中'];
+  return '本場' + distType + '距離，' + w.hint + '、爆發決勝最後直線';
+}
 const CLASS_WINDOWS = [[10, 20], [8, 18], [6, 16], [4, 14], [2, 12], [0, 10]];
 const RACE_SCHEDULE = [
   { id: 'r1', name: '新馬戰', grade: '新馬', dist: 1200, turf: '草', distType: '短' },
@@ -326,9 +337,10 @@ function formBonus(hid) {
   return clamp((4 - avg) * 1.5, -4.5, 4.5);
 }
 function horsePower(h, race) {
-  const base = basePower(h);
+  const w = DIST_WEIGHTS[race.distType] || DIST_WEIGHTS['中'];
+  const base = speedStat(h) * w.spd + staminaStat(h) * w.sta + kickStat(h) * w.kick;
   const turfFit = h.turf === race.turf ? 1.10 : 0.90;
-  const distFit = h.dist === race.distType ? 1.10 : 0.90;
+  const distFit = h.dist === race.distType ? 1.05 : 0.95;
   let wMult = 1;
   if (race.weather === 'rain') wMult = h.turf === '泥' ? 1.10 : 0.94;
   return base * turfFit * distFit * wMult + formBonus(h.id);
@@ -379,7 +391,7 @@ function rollEvent(h, race) {
   if (r < awakenUp) return { event: 'awaken', mult: 1.25 };
   if (r < 0.17) return { event: 'slow', mult: 0.92 };
   if (r < 0.22) return { event: 'jockey', mult: 0.94 };
-  if (h.gut >= 82 && r < 0.37) return { event: 'kick', mult: 1.12 };
+  if (kickStat(h) >= 82 && r < 0.37) return { event: 'kick', mult: 1.12 };
   return { event: null, mult: 1 };
 }
 function buildOutcome(race) {
@@ -831,7 +843,8 @@ function renderBetSheet() {
       + '<div class="flex items-center gap-2.5"><img src="' + COATS[h.coat].img + '" alt="" class="w-11 h-11 object-cover rounded-lg border border-[#d8cbb3] bg-[#f4ede0] shrink-0">'
       + '<div class="flex-1 min-w-0"><div class="flex items-center justify-between gap-1"><span class="font-black text-sm truncate">' + esc(h.name) + (state.ownedHorseId === r.hid ? ' 👑' : '') + (picked ? ' <span class="text-[#d9941a]">' + badge + '</span>' : '') + '</span>'
       + '<span class="text-sm font-black text-[#1d6b41] whitespace-nowrap">獨贏 ' + r.winOdds + ' 倍</span></div>'
-      + '<div class="text-xs text-[#5c5346] mt-0.5">騎師 ' + esc(h.jockey) + '・' + h.turf + '地・' + h.dist + '距離・戰力 ' + Math.round(r.power) + '</div>'
+      + '<div class="text-xs text-[#5c5346] mt-0.5">騎師 ' + esc(h.jockey) + '・' + h.turf + '地・' + h.dist + '距離</div>'
+      + '<div class="text-xs mt-0.5">速 <b class="' + (DIST_WEIGHTS[race.distType].spd >= 0.5 ? 'text-[#1d6b41]' : '') + '">' + speedStat(h) + '</b>・耐 <b class="' + (DIST_WEIGHTS[race.distType].sta >= 0.5 ? 'text-[#1d6b41]' : '') + '">' + staminaStat(h) + '</b>・爆 <b>' + kickStat(h) + '</b></div>'
       + '<div class="text-xs text-[#5c5346]">' + formText(r.hid) + '</div></div></div></button>';
   }).join('');
   const typeBtns = Object.keys(BET_TYPES).map(k => '<button type="button" onclick="setBetType(\'' + k + '\')" class="flex-1 py-2 text-sm ' + (betDraft.type === k ? 'gold-btn' : 'paper-btn') + '">' + BET_TYPES[k].label + '</button>').join('');
@@ -854,7 +867,7 @@ function renderBetSheet() {
       + '<button type="button" onclick="runRace()" class="paper-btn text-sm px-4 py-2 mt-2 w-full">不下注，直接看比賽</button>';
   }
   el.innerHTML = '<div class="flex items-center justify-between"><h2 class="font-black text-base">第 ' + (state.raceIdx + 1) + ' 場・' + esc(race.name) + '</h2><span class="chip bg-[#1d6b41] text-white">' + race.dist + 'm ' + race.turf + '地・' + race.distType + '距離 ' + (WEATHERS[race.weather] || WEATHERS.sunny).icon + '</span></div>'
-    + '<p class="text-xs text-[#5c5346] mt-1">' + (WEATHERS[race.weather] || WEATHERS.sunny).hint + '。⚠️ 戰力只是參考：摔馬、覺醒、天氣都可能改寫結果。</p>'
+    + '<p class="text-xs text-[#5c5346] mt-1">' + (WEATHERS[race.weather] || WEATHERS.sunny).hint + '。' + distHintText(race.distType) + '。⚠️ 沒有萬能馬：摔馬、覺醒、天氣都可能改寫結果。</p>'
     + rows + betArea;
 }
 function renderSpend() {
@@ -901,6 +914,7 @@ function renderRecords() {
       + (seen ? '<img src="' + COATS[h.coat].img + '" alt="" class="w-full aspect-square object-cover rounded-xl border border-[#d8cbb3] bg-[#f4ede0]">' : '<div class="w-full aspect-square rounded-xl border border-[#d8cbb3] bg-[#f4ede0] flex items-center justify-center text-2xl">❓</div>')
       + '<div class="text-[10px] font-bold mt-0.5 truncate">' + esc(h.name) + (owned ? ' 👑' : '') + '</div>'
       + '<div class="text-[10px] text-[#5c5346]">' + (seen ? st.wins + '勝/' + st.races + '戰' : '還沒出賽') + '</div>'
+      + '<div class="text-[10px] text-[#5c5346]">速 ' + speedStat(h) + '・耐 ' + staminaStat(h) + '・爆 ' + kickStat(h) + '</div>'
       + (owned ? '<div class="text-[10px] font-black text-[#d9941a]">我的馬</div>'
         : '<button type="button" onclick="buyHorse(\'' + h.id + '\')" class="text-[10px] font-bold text-[#1d6b41] underline">買下 ' + fmt(ownerPrice(h.id)) + '</button>')
       + '</div>';

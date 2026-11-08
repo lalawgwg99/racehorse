@@ -47,7 +47,7 @@ function t(name, cond, extra) {
   else { fail++; console.log('FAIL: ' + name + (extra !== undefined ? ' | ' + extra : '')); }
 }
 
-eval(script + ';globalThis.__T={createDefaultState,migrateState,migratedMoney,saveState,loadState,formBonus,horsePower,calcOdds,comboOdds,payoutFor,genDayRaces,currentRace,todayStats,setBetType,setBetAmount,betAllIn,setCustomAmount,togglePick,betOddsFor,placeBet,doWork,checkRelief,finishRace,nextRace,nextDay,showDaySummary,raceCommentAt,renderHeader,renderSchedule,renderBetSheet,renderRecords,renderAll,switchView,effFor,rollEvent,buildOutcome,eventText,eventReveal,rollWeather,ownerRaceIdx,vipBonus,buyVip,buyNaming,buyTrophy,ownerPrice,buyHorse,startGallop,stopGallop,cheer,HORSES,HORSE_MAP,RACE_SCHEDULE,BET_TYPES,BET_CHIPS,WEATHERS,VIP_TIERS,TROPHIES,NAMING_PRICE,NAMING_DAYS,OWNER_WIN_BONUS,OWNER_G1_BONUS,OWNER_PLACE_BONUS,COATS,SAVE_KEY,OLD_SAVE_KEY,$,get state(){return state},set state(v){state=v},get betDraft(){return betDraft},set betDraft(v){betDraft=v},get racing(){return racing},set racing(v){racing=v},get gallopTimer(){return gallopTimer}};');
+eval(script + ';globalThis.__T={createDefaultState,migrateState,migratedMoney,saveState,loadState,formBonus,horsePower,calcOdds,comboOdds,payoutFor,genDayRaces,currentRace,todayStats,setBetType,setBetAmount,betAllIn,setCustomAmount,togglePick,betOddsFor,placeBet,doWork,checkRelief,finishRace,nextRace,nextDay,showDaySummary,raceCommentAt,renderHeader,renderSchedule,renderBetSheet,renderRecords,renderAll,switchView,effFor,rollEvent,buildOutcome,eventText,eventReveal,rollWeather,ownerRaceIdx,vipBonus,buyVip,buyNaming,buyTrophy,ownerPrice,buyHorse,startGallop,stopGallop,cheer,speedStat,staminaStat,kickStat,DIST_WEIGHTS,distHintText,HORSES,HORSE_MAP,RACE_SCHEDULE,BET_TYPES,BET_CHIPS,WEATHERS,VIP_TIERS,TROPHIES,NAMING_PRICE,NAMING_DAYS,OWNER_WIN_BONUS,OWNER_G1_BONUS,OWNER_PLACE_BONUS,COATS,SAVE_KEY,OLD_SAVE_KEY,$,get state(){return state},set state(v){state=v},get betDraft(){return betDraft},set betDraft(v){betDraft=v},get racing(){return racing},set racing(v){racing=v},get gallopTimer(){return gallopTimer}};');
 const T = globalThis.__T;
 const realRandom = Math.random;
 function mockRandom(v) { Math.random = () => v; }
@@ -93,7 +93,7 @@ const h01 = T.HORSE_MAP['h01']; // 草・長
 const pwFit = T.horsePower(h01, { turf: '草', distType: '長' });
 const pwNoFit = T.horsePower(h01, { turf: '泥', distType: '短' });
 t('B4 適性高戰力高', pwFit > pwNoFit, pwFit + ' vs ' + pwNoFit);
-t('B4 適性加成約1.49倍', Math.abs(pwFit / pwNoFit - (1.1 * 1.1) / (0.9 * 0.9)) < 0.05, (pwFit / pwNoFit).toFixed(3));
+t('B4 適性加成約1.35倍', Math.abs(pwFit / pwNoFit - (1.1 * 1.05) / (0.9 * 0.95)) < 0.05, (pwFit / pwNoFit).toFixed(3));
 
 // --- B5 近況加成 ---
 freshState();
@@ -351,8 +351,8 @@ t('B32 0.12慢閘', T.rollEvent(hGut, raceEv).event === 'slow');
 mockRandom(0.20);
 t('B32 0.20騎師失誤', T.rollEvent(hGut, raceEv).event === 'jockey');
 mockRandom(0.30);
-t('B32 0.30高根性末腳', T.rollEvent(hGut, raceEv).event === 'kick');
-t('B32 0.30低根性無事', T.rollEvent(hLow, raceEv).event === null);
+t('B32 0.30高爆發末腳', T.rollEvent(hGut, raceEv).event === 'kick');
+t('B32 0.30低爆發無事', T.rollEvent(hLow, raceEv).event === null);
 mockRandom(0.5);
 t('B32 0.5無事', T.rollEvent(hGut, raceEv).event === null);
 mockRandom(0.12);
@@ -497,5 +497,37 @@ t('B42 有天氣', html.includes('WEATHERS') && html.includes('雨天'));
 t('B42 有馬蹄聲歡呼', html.includes('startGallop') && html.includes('cheer('));
 t('B42 有花錢去處', html.includes('VIP') && html.includes('冠名') && html.includes('獎盃') && html.includes('買下'));
 t('B42 下注無上限', html.includes('自訂金額') && html.includes('無上限') && html.includes('betAllIn'));
+
+// --- B43 三數值 ---
+const h24b = T.HORSE_MAP['h24'];
+t('B43 金甲神駒速90耐88爆86', T.speedStat(h01) === 90 && T.staminaStat(h01) === 88 && T.kickStat(h01) === 86, T.speedStat(h01) + '/' + T.staminaStat(h01) + '/' + T.kickStat(h01));
+t('B43 黃金傳奇速62耐64爆61', T.speedStat(h24b) === 62 && T.staminaStat(h24b) === 64 && T.kickStat(h24b) === 61, T.speedStat(h24b) + '/' + T.staminaStat(h24b) + '/' + T.kickStat(h24b));
+t('B43 距離提示', T.distHintText('短').includes('速度最重要') && T.distHintText('長').includes('耐力最重要') && T.distHintText('中').includes('並重'));
+
+// --- B44 距離加權：速度馬贏短途、耐力馬贏長途 ---
+const speedHorse = { id: 'tx1', spd: 95, sta: 60, pow: 70, gut: 60, wis: 70, turf: '草', dist: '短' };
+const staminaHorse = { id: 'tx2', spd: 60, sta: 95, pow: 70, gut: 60, wis: 70, turf: '草', dist: '長' };
+const shortRace = { turf: '草', distType: '短', weather: 'sunny' };
+const longRace = { turf: '草', distType: '長', weather: 'sunny' };
+const spShort = T.horsePower(speedHorse, shortRace), spLong = T.horsePower(speedHorse, longRace);
+const stShort = T.horsePower(staminaHorse, shortRace), stLong = T.horsePower(staminaHorse, longRace);
+t('B44 速度馬短途強於長途', spShort > spLong, spShort.toFixed(1) + ' vs ' + spLong.toFixed(1));
+t('B44 耐力馬長途強於短途', stLong > stShort, stLong.toFixed(1) + ' vs ' + stShort.toFixed(1));
+t('B44 短途速度馬勝耐力馬', spShort > stShort, spShort.toFixed(1) + ' vs ' + stShort.toFixed(1));
+t('B44 長途耐力馬勝速度馬', stLong > spLong, stLong.toFixed(1) + ' vs ' + spLong.toFixed(1));
+
+// --- B45 下注頁顯示三數值、沒有單一戰力 ---
+freshState();
+mockRandom(0.5);
+T.genDayRaces();
+unmock();
+T.renderBetSheet();
+const bs45 = T.$('bet-sheet').innerHTML;
+t('B45 下注頁有速耐爆', bs45.includes('速') && bs45.includes('耐') && bs45.includes('爆'));
+t('B45 下注頁無單一戰力', !bs45.includes('戰力'));
+t('B45 下注頁有距離提示', bs45.includes('最重要') || bs45.includes('並重'));
+T.renderRecords();
+const cg45 = T.$('collection-grid').innerHTML;
+t('B45 圖鑑有三數值', cg45.includes('速') && cg45.includes('耐') && cg45.includes('爆'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
